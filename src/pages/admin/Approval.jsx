@@ -537,11 +537,14 @@ function Approval() {
 
 
   const getTaskStatistics = () => {
-    const totalCompleted = historyData.length;
+    const currentData = activeApprovalTab === 'checklist' ? historyData : delegationHistoryData;
+    const currentFilteredData = activeApprovalTab === 'checklist' ? filteredHistoryData : filteredDelegationHistoryData;
+
+    const totalCompleted = currentData.length;
     const memberStats =
       selectedMembers.length > 0
         ? selectedMembers.reduce((stats, member) => {
-          const memberTasks = historyData.filter(
+          const memberTasks = currentData.filter(
             (task) => task["col4"] === member
           ).length;
           return {
@@ -550,7 +553,7 @@ function Approval() {
           };
         }, {})
         : {};
-    const filteredTotal = filteredHistoryData.length;
+    const filteredTotal = currentFilteredData.length;
     return {
       totalCompleted,
       memberStats,

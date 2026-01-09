@@ -94,7 +94,7 @@ export default function AdminDashboard() {
       filteredTasks = [...allTasks];
     } else if (type === 'completed') {
       filteredTasks = allTasks.filter(task =>
-        task.status === 'completed'
+        task.status === 'completed' && !task.isArchive
       );
     } else if (type === 'pending') {
       if (dashboardType === 'delegation') {
