@@ -385,6 +385,9 @@ const CalendarUI = ({ userRole, userName, displayName }) => {
         { timeout: 30000 }
       );
       if (!isMounted) return;
+
+      console.log("calendar: Raw Unique Sheet Response:", uniqueResponse.data); // DEBUG LOG
+
       let uniqueTasks = [];
       if (
         uniqueResponse.data &&
@@ -394,8 +397,12 @@ const CalendarUI = ({ userRole, userName, displayName }) => {
         uniqueTasks = transformToTasks(uniqueResponse.data.table.rows);
       }
 
+      console.log("calendar: Transformed Tasks:", uniqueTasks); // DEBUG LOG
+
       // NEW: Extract unique names for dropdown
       const names = extractUniqueNames(uniqueTasks);
+      console.log("calendar: Extracted Names for Dropdown:", names); // DEBUG LOG
+
       setAvailableNames(names);
 
       // Step 3: Calculate stats
@@ -586,13 +593,82 @@ const CalendarUI = ({ userRole, userName, displayName }) => {
   if (loading)
     return (
       <AdminLayout>
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 px-4">
-          <div className="relative">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-100 py-4 sm:py-8 px-2 sm:px-4">
+          <div className="max-w-7xl mx-auto">
+            {/* Header Skeleton */}
+            <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-3 border border-gray-100 animate-pulse">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-gray-200 rounded-lg"></div>
+                  <div className="h-6 w-32 bg-gray-200 rounded"></div>
+                </div>
+                <div className="flex gap-2">
+                  <div className="h-8 w-32 bg-gray-200 rounded-lg"></div>
+                  <div className="h-8 w-20 bg-gray-200 rounded-lg"></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Calendar Skeleton */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl p-2 sm:p-8 border border-indigo-100 animate-pulse">
+              {/* Calendar Toolbar Skeleton */}
+              <div className="flex flex-col sm:flex-row justify-between mb-6 gap-4">
+                <div className="flex gap-2">
+                  <div className="h-9 w-9 bg-gray-200 rounded"></div>
+                  <div className="h-9 w-9 bg-gray-200 rounded"></div>
+                  <div className="h-9 w-20 bg-gray-200 rounded"></div>
+                </div>
+                <div className="h-8 w-48 bg-gray-200 rounded mx-auto"></div>
+                <div className="flex gap-2 justify-end">
+                  <div className="h-9 w-16 bg-gray-200 rounded"></div>
+                  <div className="h-9 w-16 bg-gray-200 rounded"></div>
+                  <div className="h-9 w-16 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+
+              {/* Loading Symbol Overlay */}
+              <div className="absolute inset-0 flex items-center justify-center z-10">
+                <div className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-lg border border-indigo-100 flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                  <span className="text-sm font-medium text-indigo-600 animate-pulse">Loading Date...</span>
+                </div>
+              </div>
+
+              {/* Calendar Grid Skeleton */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden opacity-50">
+                {/* Days Header */}
+                <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
+                  {[...Array(7)].map((_, i) => (
+                    <div key={`head-${i}`} className="p-3 text-center">
+                      <div className="h-4 w-8 bg-gray-200 rounded mx-auto"></div>
+                    </div>
+                  ))}
+                </div>
+                {/* Month Grid (5 rows) */}
+                {[...Array(5)].map((_, row) => (
+                  <div key={`row-${row}`} className="grid grid-cols-7 border-b border-gray-100 last:border-0">
+                    {[...Array(7)].map((_, col) => (
+                      <div
+                        key={`cell-${row}-${col}`}
+                        className="h-24 sm:h-32 border-r border-gray-100 last:border-0 p-2"
+                      >
+                        <div className="flex justify-end mb-2">
+                          <div className="h-4 w-4 bg-gray-100 rounded-full"></div>
+                        </div>
+                        {/* Random content simulation */}
+                        {((row + col) % 3 === 0) && (
+                          <div className="space-y-1">
+                            <div className="h-3 w-full bg-indigo-50 rounded"></div>
+                            <div className="h-3 w-2/3 bg-indigo-50 rounded"></div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          <p className="mt-6 text-lg sm:text-xl font-semibold text-gray-700 animate-pulse text-center">
-            Loading calendar data...
-          </p>
         </div>
       </AdminLayout>
     );

@@ -587,7 +587,7 @@ function Approval() {
 
       // Fetch Checklist data
       const checklistResponse = await fetch(
-        `${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.SHEET_NAME}&action=fetch`
+        `${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.SHEET_NAME}&action=fetch&t=${Date.now()}`
       );
       if (!checklistResponse.ok) {
         throw new Error(`Failed to fetch checklist data: ${checklistResponse.status}`);
@@ -609,7 +609,7 @@ function Approval() {
 
       // Fetch Delegation data
       const delegationResponse = await fetch(
-        `${CONFIG.APPS_SCRIPT_URL}?sheet=Delegation&action=fetch`
+        `${CONFIG.APPS_SCRIPT_URL}?sheet=Delegation&action=fetch&t=${Date.now()}`
       );
       if (!delegationResponse.ok) {
         throw new Error(`Failed to fetch delegation data: ${delegationResponse.status}`);
@@ -718,6 +718,7 @@ function Approval() {
             { id: "col13", label: "Remarks", type: "string" },
             { id: "col14", label: "Uploaded Image", type: "string" },
             { id: "col15", label: "Admin Done", type: "string" }, // Column P for Checklist
+            { id: "col16", label: "Sub Category", type: "string" }, // Column Q
           ] : [
             { id: "col0", label: "Timestamp", type: "string" },
             { id: "col1", label: "Task ID", type: "string" },
@@ -739,6 +740,8 @@ function Approval() {
             { id: "col17", label: "Column R", type: "string" },
             { id: "col18", label: "Column S", type: "string" },
             { id: "col19", label: "Admin Done", type: "string" }, // Column T for Delegation
+            { id: "col20", label: "Column U", type: "string" },
+            { id: "col21", label: "Sub Category", type: "string" }, // Column V
           ];
 
           columnHeaders.forEach((header, index) => {
@@ -1166,6 +1169,9 @@ function Approval() {
                             Name
                           </th>
                         )}
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                          Sub Category
+                        </th>
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
                           Task Description
                         </th>
@@ -1393,6 +1399,12 @@ function Approval() {
                                 </td>
                               )}
 
+                              <td className="px-3 py-4 min-w-[120px]">
+                                <div className="text-sm text-gray-900 break-words">
+                                  {history._sheetType === 'delegation' ? (history["col21"] || "—") : (history["col16"] || "—")}
+                                </div>
+                              </td>
+
                               <td className="px-3 py-4 min-w-[200px]">
                                 <div className="text-sm text-gray-900 break-words" title={history["col5"]}>
                                   {history["col5"] || "—"}
@@ -1536,6 +1548,12 @@ function Approval() {
                         >
                           {/* Mobile card content - replicate your table row data here */}
                           <div className="space-y-3">
+                            <div className="flex justify-between items-center border-b pb-2">
+                              <span className="font-medium text-gray-700">Sub Category:</span>
+                              <div className="text-sm text-gray-900 break-words">
+                                {history._sheetType === 'delegation' ? (history["col21"] || "—") : (history["col16"] || "—")}
+                              </div>
+                            </div>
                             {userRole === "admin" && (
                               <div className="px-3 py-4 w-12">
                                 {!isEmpty(history["col15"]) &&

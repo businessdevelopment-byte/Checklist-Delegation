@@ -44,6 +44,7 @@ function AccountDataPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [remarksData, setRemarksData] = useState({});
+  const [subCategoryUpdates, setSubCategoryUpdates] = useState({});
   const [historyData, setHistoryData] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [membersList, setMembersList] = useState([]);
@@ -864,7 +865,7 @@ function AccountDataPage() {
       const pendingAccounts = [];
       const historyRows = [];
       const response = await fetch(
-        `${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.SHEET_NAME}&action=fetch`
+        `${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.SHEET_NAME}&action=fetch&t=${Date.now()}`
       );
       if (!response.ok) {
         throw new Error(`Failed to fetch data: ${response.status}`);
@@ -962,6 +963,7 @@ function AccountDataPage() {
           { id: "col13", label: "Remarks", type: "string" },
           { id: "col14", label: "Uploaded Image", type: "string" },
           { id: "col15", label: "Admin Done", type: "string" }, // Column P
+          { id: "col16", label: "Sub Category", type: "string" }, // Column Q
         ];
 
         columnHeaders.forEach((header, index) => {
@@ -1037,6 +1039,11 @@ function AccountDataPage() {
           delete newRemarksData[id];
           return newRemarksData;
         });
+        setSubCategoryUpdates((prev) => {
+          const newData = { ...prev };
+          delete newData[id];
+          return newData;
+        });
       }
       // console.log(`Updated selection: ${Array.from(newSelected)}`)
       return newSelected;
@@ -1066,6 +1073,7 @@ function AccountDataPage() {
         setSelectedItems(new Set());
         setAdditionalData({});
         setRemarksData({});
+        setSubCategoryUpdates({});
         // console.log("Cleared all selections")
       }
     },
@@ -1227,7 +1235,8 @@ function AccountDataPage() {
             imageUrlMap[id] ||
             (item.image && typeof item.image === "string" ? item.image : ""), // Column O
 
-          buddyName: isBuddyTask ? username : "",
+          subCategory: item["col16"] || "", // Column Q
+          "Sub Category": item["col16"] || "", // Ensure explicit header match
         });
       }
 
@@ -1242,6 +1251,7 @@ function AccountDataPage() {
           col14:
             imageUrlMap[id] ||
             (item.image && typeof item.image === "string" ? item.image : ""), // Column O
+          col16: subCategoryUpdates[id] !== undefined ? subCategoryUpdates[id] : (item["col16"] || ""), // Column Q
         };
       });
 
@@ -1253,6 +1263,7 @@ function AccountDataPage() {
       setSelectedItems(new Set());
       setAdditionalData({});
       setRemarksData({});
+      setSubCategoryUpdates({});
 
       // Submit to Google Sheets
       const formData = new FormData();
@@ -1675,6 +1686,13 @@ function AccountDataPage() {
                         </th>
                       )}
 
+                      {/* Hide Sub Category column for admin in history view */}
+                      {userRole !== "admin" && isAdmin && (
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                          Sub Category
+                        </th>
+                      )}
+
                       {/* Hide Given By column for admin in history view */}
                       {userRole !== "admin" && isAdmin && (
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
@@ -1915,6 +1933,14 @@ function AccountDataPage() {
                                 </div>
                               </td>
                             )}
+                            {/* Hide Sub Category column for admin in history view */}
+                            {userRole !== "admin" && isAdmin && (
+                              <td className="px-3 py-4 min-w-[120px]">
+                                <div className="text-sm text-gray-900 break-words">
+                                  {history["col16"] || "—"}
+                                </div>
+                              </td>
+                            )}
 
                             {/* Hide Given By column for admin in history view */}
                             {userRole !== "admin" && isAdmin && (
@@ -2055,6 +2081,7 @@ function AccountDataPage() {
                             (userRole === "admin" ? 1 : 0) + // Admin checkbox column (now second)
                             (userRole !== "admin" ? 1 : 0) + // Task ID column
                             (userRole !== "admin" && isAdmin ? 1 : 0) + // Department Name column
+                            (userRole !== "admin" && isAdmin ? 1 : 0) + // Sub Category column
                             (userRole !== "admin" && isAdmin ? 1 : 0) + // Given By column
                             (userRole !== "admin" && isAdmin ? 1 : 0) + // Name column
                             7 + // Fixed columns (Task Description, Task Start Date, Freq, Require Attachment, Actual Date, Status, Remarks, Attachment)
@@ -2099,6 +2126,11 @@ function AccountDataPage() {
                       {isAdmin && (
                         <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                           Department Name
+                        </th>
+                      )}
+                      {isAdmin && (
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                          Sub Category
                         </th>
                       )}
                       {isAdmin && (
@@ -2209,6 +2241,13 @@ function AccountDataPage() {
                               <td className="px-3 py-4 min-w-[120px]">
                                 <div className="text-sm text-gray-900 break-words">
                                   {account["col2"] || "—"}
+                                </div>
+                              </td>
+                            )}
+                            {isAdmin && (
+                              <td className="px-3 py-4 min-w-[120px]">
+                                <div className="text-sm text-gray-900 break-words">
+                                  {account["col16"] || "—"}
                                 </div>
                               </td>
                             )}
@@ -2399,7 +2438,7 @@ function AccountDataPage() {
                     ) : (
                       <tr>
                         <td
-                          colSpan={isAdmin ? 13 : 9}
+                          colSpan={isAdmin ? 14 : 9}
                           className="px-6 py-4 text-center text-gray-500"
                         >
                           {searchTerm
@@ -2457,6 +2496,18 @@ function AccountDataPage() {
                               </span>
                               <div className="text-sm text-gray-900 break-words">
                                 {account["col2"] || "—"}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Sub Category (Admin only) */}
+                          {isAdmin && (
+                            <div className="flex justify-between items-center border-b pb-2">
+                              <span className="font-medium text-gray-700">
+                                Sub Category:
+                              </span>
+                              <div className="text-sm text-gray-900 break-words">
+                                {account["col16"] || "—"}
                               </div>
                             </div>
                           )}

@@ -186,75 +186,78 @@ export default function QuickTask() {
         throw new Error('User configuration missing. Please log in again.');
       }
 
-      // Fetch last Task ID via Apps Script proxy
-      const sheetUrl = `${userAppScriptUrl}?sheet=${CONFIG.CHECKLIST_SHEET}&action=fetch`;
-      const sheetResponse = await fetch(sheetUrl);
-      const sheetData = await sheetResponse.json();
+      console.log(`Starting updates for ${selectedRows.size} tasks...`);
 
-      let lastTaskId = 0;
-      if (sheetData?.table?.rows) {
-        for (let i = 1; i < sheetData.table.rows.length; i++) {
-          const taskIdValue = sheetData.table.rows[i].c[1]?.v;
-          if (taskIdValue) {
-            const taskIdNum = parseInt(taskIdValue);
-            if (!isNaN(taskIdNum)) lastTaskId = Math.max(lastTaskId, taskIdNum);
-          }
-        }
-      }
-
-      // Generate tasks with sequential Task IDs
-      const tasksToSubmit = Array.from(selectedRows).map((taskId, index) => {
+      // We perform individual row updates as requested by the user
+      const updatePromises = Array.from(selectedRows).map(async (taskId) => {
         const editedTask = editedData[taskId];
-        const newTaskId = lastTaskId + index + 1;
+        const rowIndex = editedTask._rowIndex;
+
+        if (!rowIndex) {
+          console.warn(`No rowIndex found for task ${taskId}, skipping update.`);
+          return { success: false, taskId };
+        }
+
         const currentTimestamp = formatTimestampForSheet();
+        const isChecklist = activeTab === 'checklist';
+        const sheetName = isChecklist ? CONFIG.CHECKLIST_SHEET : CONFIG.DELEGATION_SHEET;
 
-        // Log the original and formatted date for debugging
-        console.log("Date processing:", {
-          original: editedTask['End Date'],
-          formatted: formatDateForSheet(editedTask['End Date'])
-        });
-
-        return {
+        // Construct row object for the update action
+        const rowDataObj = {
           timestamp: currentTimestamp,
-          taskId: String(newTaskId),
+          taskId: editedTask['Task ID'] || "",
           department: editedTask.Department || "",
           givenBy: editedTask['Given By'] || "",
           name: editedTask.Name || "",
           description: editedTask['Task Description'] || "",
-          startDate: formatDateForSheet(editedTask['End Date']), // Use the improved function
-          freq: editedTask.Frequency || "",
-          enableReminders: editedTask.Reminders || "",
-          requireAttachment: editedTask.Attachment || ""
+          "Sub Category": editedTask['Sub Category'] || "",
+          subCategory: editedTask['Sub Category'] || "",
         };
+
+        if (isChecklist) {
+          rowDataObj.startDate = formatDateForSheet(editedTask['End Date']);
+          rowDataObj.freq = editedTask.Frequency || "";
+          rowDataObj.enableReminders = editedTask.Reminders || "";
+          rowDataObj.requireAttachment = editedTask.Attachment || "";
+        } else {
+          // Delegation sheet mapping
+          rowDataObj.startDate = editedTask['Task End Date'] || "";
+          rowDataObj.freq = editedTask.Freq || "";
+          rowDataObj.enableReminders = editedTask['Enable Reminders'] || "";
+          rowDataObj.requireAttachment = editedTask['Require Attachment'] || "";
+        }
+
+        const response = await fetch(userAppScriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            action: 'update',
+            sheetName: sheetName,
+            rowIndex: rowIndex.toString(),
+            rowData: JSON.stringify(rowDataObj)
+          })
+        });
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return await response.json();
       });
 
-      console.log("Final tasks to submit:", tasksToSubmit);
+      const results = await Promise.all(updatePromises);
+      const allSuccessful = results.every(r => r.success);
 
-      const submitUrl = `${userAppScriptUrl}?sheetName=${CONFIG.CHECKLIST_SHEET}&action=insert&batchInsert=true`;
-      const response = await fetch(submitUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          rowData: JSON.stringify(tasksToSubmit),
-          sheetName: CONFIG.CHECKLIST_SHEET,
-          action: 'insert',
-          batchInsert: 'true'
-        })
-      });
-
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const result = await response.json();
-
-      if (!result.success) throw new Error(result.error || 'Server returned error');
+      if (!allSuccessful) {
+        const errors = results.filter(r => !r.success).map(r => r.error).join(', ');
+        throw new Error(`Some updates failed: ${errors}`);
+      }
 
       setSelectedRows(new Set());
       setEditingRows(new Set());
       setEditedData({});
       await fetchChecklistData();
       await fetchDelegationData();
-      alert(`Successfully submitted ${tasksToSubmit.length} tasks!`);
+      alert(`Successfully updated ${selectedRows.size} tasks!`);
     } catch (error) {
-      console.error('Submission error:', error);
+      console.error('Update error:', error);
       alert(`Error: ${error.message}`);
     } finally {
       setSubmitting(false);
@@ -379,6 +382,7 @@ export default function QuickTask() {
             Department: row.c[2]?.v || "",
             'Given By': row.c[3]?.v || "",
             Name: row.c[4]?.v || "",
+            'Sub Category': row.c[14]?.v || "", // Column O (Index 14)
             'Task Description': row.c[5]?.v || "",
             'End Date': startDateValue, // Use processed date
             Frequency: row.c[7]?.v || "",
@@ -844,6 +848,7 @@ export default function QuickTask() {
                       </th>
                       {[
                         { key: 'Department', label: 'Department' },
+                        { key: 'Sub Category', label: 'Sub Category' },
                         { key: 'Given By', label: 'Given By' },
                         { key: 'Name', label: 'Name' },
                         { key: 'Task Description', label: 'Task Description', minWidth: 'min-w-[300px]' },
@@ -910,6 +915,19 @@ export default function QuickTask() {
                                 />
                               ) : (
                                 task.Department || "—"
+                              )}
+                            </td>
+                            {/* Sub Category Column */}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editedTask['Sub Category'] || ''}
+                                  onChange={(e) => handleInputChange(task._id, 'Sub Category', e.target.value)}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                />
+                              ) : (
+                                task['Sub Category'] || "—"
                               )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -995,12 +1013,14 @@ export default function QuickTask() {
                                   <option value="Daily">Daily</option>
                                   <option value="Weekly">Weekly</option>
                                   <option value="Monthly">Monthly</option>
+                                  <option value="alternate-day">Alternate Day</option>
                                 </select>
                               ) : (
                                 <span className={`px-2 py-1 rounded-full text-xs ${task.Frequency === 'Daily' ? 'bg-blue-100 text-blue-800' :
                                   task.Frequency === 'Weekly' ? 'bg-green-100 text-green-800' :
                                     task.Frequency === 'Monthly' ? 'bg-purple-100 text-purple-800' :
-                                      'bg-gray-100 text-gray-800'
+                                      (task.Frequency === 'alternate-day' || task.Frequency === 'Alternate Day') ? 'bg-orange-100 text-orange-800' :
+                                        'bg-gray-100 text-gray-800'
                                   }`}>
                                   {task.Frequency || "—"}
                                 </span>
@@ -1117,6 +1137,21 @@ export default function QuickTask() {
                               )}
                             </div>
                             <div className="flex justify-between items-center border-b pb-2">
+                              <span className="font-medium text-gray-700">Sub Category:</span>
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editedTask['Sub Category'] || ''}
+                                  onChange={(e) => handleInputChange(task._id, 'Sub Category', e.target.value)}
+                                  className="w-[35%] px-2 py-1 border border-gray-300 rounded text-sm"
+                                />
+                              ) : (
+                                <div className="text-sm text-gray-900 break-words text-right w-[35%]">
+                                  {task['Sub Category'] || "—"}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex justify-between items-center border-b pb-2">
                               <span className="font-medium text-gray-700">Given By:</span>
                               {isEditing ? (
                                 <input
@@ -1209,12 +1244,14 @@ export default function QuickTask() {
                                   <option value="Daily">Daily</option>
                                   <option value="Weekly">Weekly</option>
                                   <option value="Monthly">Monthly</option>
+                                  <option value="alternate-day">Alternate Day</option>
                                 </select>
                               ) : (
                                 <span className={`px-2 py-1 rounded-full text-xs ${task.Frequency === 'Daily' ? 'bg-blue-100 text-blue-800' :
                                   task.Frequency === 'Weekly' ? 'bg-green-100 text-green-800' :
                                     task.Frequency === 'Monthly' ? 'bg-purple-100 text-purple-800' :
-                                      'bg-gray-100 text-gray-800'
+                                      (task.Frequency === 'alternate-day' || task.Frequency === 'Alternate Day') ? 'bg-orange-100 text-orange-800' :
+                                        'bg-gray-100 text-gray-800'
                                   }`}>
                                   {task.Frequency || "—"}
                                 </span>

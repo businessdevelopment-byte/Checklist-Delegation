@@ -711,6 +711,13 @@ export default function AdminDashboard() {
 
         const department = getCellValue(row, 2) || "";
 
+        let subCategory = "";
+        if (dashboardType === "delegation") {
+          subCategory = getCellValue(row, 21) || ""; // Column V
+        } else {
+          subCategory = getCellValue(row, 16) || ""; // Column Q
+        }
+
         // Count logic
         let shouldCountInStats = false;
         if (dashboardType === "delegation") {
@@ -731,6 +738,7 @@ export default function AdminDashboard() {
           title: taskDescription,
           assignedTo,
           department,
+          subCategory,
           taskStartDate,
           dueDate: taskStartDate,
           status,
@@ -1389,6 +1397,9 @@ export default function AdminDashboard() {
                           Assigned To
                         </th>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Sub Category
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Task End Date
                         </th>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1402,6 +1413,7 @@ export default function AdminDashboard() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{task.id}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.title}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.assignedTo}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.subCategory || "—"}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{task.taskStartDate}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span
@@ -1443,6 +1455,14 @@ export default function AdminDashboard() {
                           <span className="font-medium text-gray-700">Assigned To:</span>
                           <div className="text-sm text-gray-500 break-words">
                             {task.assignedTo}
+                          </div>
+                        </div>
+
+                        {/* Sub Category */}
+                        <div className="flex justify-between items-center border-b pb-2">
+                          <span className="font-medium text-gray-700">Sub Category:</span>
+                          <div className="text-sm text-gray-500 break-words">
+                            {task.subCategory || "—"}
                           </div>
                         </div>
 

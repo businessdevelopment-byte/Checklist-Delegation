@@ -931,6 +931,7 @@ function DelegationDataPage() {
                 rowData["col7"] = rowValues[7] || ""; // Column H - User name
                 rowData["col8"] = rowValues[8] || ""; // Column I - Task
                 rowData["col9"] = rowValues[9] || ""; // Column J - Given By
+                rowData["col10"] = rowValues[12] || ""; // Column M - Sub Category (Read from M)
 
                 return rowData;
               })
@@ -1006,7 +1007,7 @@ function DelegationDataPage() {
         };
 
         // Map all columns with special handling for datetime columns
-        for (let i = 0; i < 18; i++) {
+        for (let i = 0; i < 22; i++) {
           if (i === 0 || i === 6 || i === 10) {
             // Task End Date, Planned Date and other datetime columns - parse as datetime
             rowData[`col${i}`] = rowValues[i]
@@ -1251,7 +1252,11 @@ function DelegationDataPage() {
               "", // Column G
               username, // Column H - Store the logged-in username
               item["col5"] || "", // Column I - Task description from col5
+
               item["col3"] || "", // Column J - Given By from original task
+              "",                 // Column K - Empty
+              "",                 // Column L - Empty
+              item["col21"] || "", // Column M - Sub Category from col21
             ];
 
             const insertFormData = new FormData();
@@ -1604,6 +1609,9 @@ function DelegationDataPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[250px]">
                         Task
                       </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                        Sub Category
+                      </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
                         Status
                       </th>
@@ -1646,6 +1654,11 @@ function DelegationDataPage() {
                               title={history["col8"]}
                             >
                               {history["col8"] || "—"}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 min-w-[120px]">
+                            <div className="text-sm text-gray-900 whitespace-normal break-words">
+                              {history["col10"] || "—"}
                             </div>
                           </td>
                           <td className="px-6 py-4 min-w-[100px]">
@@ -1890,6 +1903,9 @@ function DelegationDataPage() {
                         Department
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                        Sub Category
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                         Given By
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
@@ -1979,6 +1995,11 @@ function DelegationDataPage() {
                             <td className="px-6 py-4 min-w-[120px]">
                               <div className="text-sm text-gray-900 whitespace-normal break-words">
                                 {account["col2"] || "—"}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 min-w-[120px]">
+                              <div className="text-sm text-gray-900 whitespace-normal break-words">
+                                {account["col21"] || "—"}
                               </div>
                             </td>
                             <td className="px-6 py-4 min-w-[120px]">

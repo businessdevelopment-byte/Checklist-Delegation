@@ -154,6 +154,8 @@ export default function AssignTask() {
   const [departmentOptions, setDepartmentOptions] = useState([]);
   const [givenByOptions, setGivenByOptions] = useState([]);
   const [doerOptions, setDoerOptions] = useState([]);
+  const [allDoers, setAllDoers] = useState([]); // Store mapping of doers to departments
+  const [subCategoryOptions, setSubCategoryOptions] = useState([]);
 
   const frequencies = [
     { value: "one-time", label: "One Time (No Recurrence)" },
@@ -169,12 +171,14 @@ export default function AssignTask() {
     { value: "end-of-3rd-week", label: "End of 3rd Week" },
     { value: "end-of-4th-week", label: "End of 4th Week" },
     { value: "end-of-last-week", label: "End of Last Week" },
+    { value: "alternate-day", label: "Alternate Day" },
   ];
 
   const [formData, setFormData] = useState({
     department: "",
     givenBy: "",
     doer: "",
+    subCategory: "", // New Field
     description: "",
     frequency: "one-time",
     enableReminders: true,
@@ -216,6 +220,7 @@ export default function AssignTask() {
       const departments = [];
       const givenBy = [];
       const doers = [];
+      const doerMapping = [];
 
       // Process all rows starting from index 1 (skip header)
       data.table.rows.slice(1).forEach((row) => {
@@ -233,11 +238,15 @@ export default function AssignTask() {
             givenBy.push(value);
           }
         }
-        // Column C - Doers
+        // Column D - Doers (Index 3)
         if (row.c && row.c[3] && row.c[3].v) {
           const value = row.c[3].v.toString().trim();
           if (value !== "") {
             doers.push(value);
+
+            // Capture Department from Column J (Index 9) - User specified "Department base" header in Column J
+            const deptBaseValue = (row.c[9] && row.c[9].v) ? row.c[9].v.toString().trim() : "";
+            doerMapping.push({ name: value, department: deptBaseValue });
           }
         }
       });
@@ -245,19 +254,72 @@ export default function AssignTask() {
       // Remove duplicates and sort
       setDepartmentOptions([...new Set(departments)].sort());
       setGivenByOptions([...new Set(givenBy)].sort());
-      setDoerOptions([...new Set(doers)].sort());
-
-      // console.log("Master sheet options loaded successfully", {
-      //   departments: [...new Set(departments)],
-      //   givenBy: [...new Set(givenBy)],
-      //   doers: [...new Set(doers)],
-      // });
+      // doerOptions and allDoers will be fetched from Whatsapp sheet instead
     } catch (error) {
       console.error("Error fetching master sheet options:", error);
       // Set default options if fetch fails
       setDepartmentOptions(["Department 1", "Department 2"]);
       setGivenByOptions(["User 1", "User 2"]);
-      setDoerOptions(["Doer 1", "Doer 2"]);
+      const fallbackDoers = ["Doer 1", "Doer 2"];
+      setDoerOptions(fallbackDoers);
+      setAllDoers([
+        { name: "Doer 1", department: "Department 1" },
+        { name: "Doer 2", department: "Department 2" }
+      ]);
+    }
+  };
+
+  // NEW: Function to fetch Sub Category and Doer options from Whatsapp sheet
+  const fetchWhatsappOptions = async () => {
+    try {
+      const sheetName = "Whatsapp";
+      const url = `https://script.google.com/macros/s/AKfycbw7hMLxUdRO4Gl_JRLtl2B5Q_FRJuCaOPC7dj_Ezvk1EPbUJR6q88AMF0oQtPCoFoFi/exec?sheet=${encodeURIComponent(
+        sheetName
+      )}&action=fetch&t=${Date.now()}`;
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch Whatsapp data: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.table || !data.table.rows) {
+        return;
+      }
+
+      const subCategories = [];
+      const doers = [];
+      const doerMapping = [];
+
+      // Process rows, skip header (Row 0)
+      data.table.rows.forEach((row, index) => {
+        if (index === 0) return;
+
+        // Extract Sub Category from column K (index 10)
+        if (row.c && row.c[10] && row.c[10].v) {
+          const value = row.c[10].v.toString().trim();
+          if (value !== "") subCategories.push(value);
+        }
+
+        // Extract Doer from column D (index 3) and Dept Base from column J (index 9)
+        if (row.c && row.c[3] && row.c[3].v) {
+          const doerName = row.c[3].v.toString().trim();
+          if (doerName !== "") {
+            doers.push(doerName);
+            const deptBase = (row.c[9] && row.c[9].v) ? row.c[9].v.toString().trim() : "";
+            doerMapping.push({ name: doerName, department: deptBase });
+          }
+        }
+      });
+
+      setSubCategoryOptions([...new Set(subCategories)].sort());
+      setAllDoers(doerMapping);
+      // Initial doerOptions can be all doers
+      setDoerOptions([...new Set(doers)].sort());
+    } catch (error) {
+      console.error("Error fetching Whatsapp options:", error);
+      setSubCategoryOptions(["Option 1", "Option 2"]); // Fallback
     }
   };
 
@@ -307,7 +369,32 @@ export default function AssignTask() {
 
   useEffect(() => {
     fetchMasterSheetOptions();
+    fetchWhatsappOptions();
   }, []);
+
+  // Filter doers when department changes
+  useEffect(() => {
+    if (formData.department) {
+      const filtered = allDoers
+        .filter((d) => d.department === formData.department)
+        .map((d) => d.name);
+
+      // Remove duplicates and sort
+      setDoerOptions([...new Set(filtered)].sort());
+
+      // If current doer is not in the filtered list, reset it
+      if (formData.doer && !filtered.includes(formData.doer)) {
+        setFormData(prev => ({ ...prev, doer: "" }));
+      }
+    } else {
+      // If no department selected, show all doers or none? 
+      // User said "according to", so showing all might be confusing if they expect filtering.
+      // But initially we might want to show all. 
+      // Let's show all available doers if no department is selected, or just leave it as is.
+      const allNames = allDoers.map(d => d.name);
+      setDoerOptions([...new Set(allNames)].sort());
+    }
+  }, [formData.department, allDoers]);
 
   // Add a function to get the last task ID from the specified sheet
   const getLastTaskId = async (sheetName) => {
@@ -493,6 +580,7 @@ export default function AssignTask() {
             department: formData.department,
             givenBy: formData.givenBy,
             doer: formData.doer,
+            subCategory: formData.subCategory,
             dueDate: taskDateTimeStr,
             status: "pending",
             frequency: formData.frequency,
@@ -544,6 +632,7 @@ export default function AssignTask() {
             department: formData.department,
             givenBy: formData.givenBy,
             doer: formData.doer,
+            subCategory: formData.subCategory,
             dueDate: taskDateTimeStr,
             status: "pending",
             frequency: formData.frequency,
@@ -563,6 +652,7 @@ export default function AssignTask() {
           department: formData.department,
           givenBy: formData.givenBy,
           doer: formData.doer,
+          subCategory: formData.subCategory,
           dueDate: taskDateTimeStr,
           status: "pending",
           frequency: formData.frequency,
@@ -582,6 +672,7 @@ export default function AssignTask() {
         department: formData.department,
         givenBy: formData.givenBy,
         doer: formData.doer,
+        subCategory: formData.subCategory,
         dueDate: taskDateTimeStr, // This becomes the End Date for recurrence
         status: "pending",
         frequency: formData.frequency,
@@ -793,6 +884,8 @@ export default function AssignTask() {
             department: task.department || formData.department,
             givenBy: task.givenBy || formData.givenBy,
             name: task.doer || formData.doer,
+            subCategory: task.subCategory || formData.subCategory, // Try camelCase to match backend convention
+            "Sub Category": task.subCategory || formData.subCategory, // Include explicit header name for Unique sheet
             description: task.description,
             startDate: task.dueDate,
             freq: task.frequency,
@@ -802,6 +895,12 @@ export default function AssignTask() {
         });
 
         console.log(`Submitting ${tasksData.length} tasks to ${sheetName} sheet`);
+        console.log("Submission Data Verification:", {
+          targetSheet: sheetName,
+          firstTask: tasksData[0],
+          subCategoryValue: tasksData[0]["Sub Category"],
+          fullPayload: tasksData
+        });
 
         // Submit all tasks in one batch to Google Sheets
         const formPayload = new FormData();
@@ -828,6 +927,7 @@ export default function AssignTask() {
         department: "",
         givenBy: "",
         doer: "",
+        subCategory: "",
         description: "",
         frequency: "one-time",
         enableReminders: true,
@@ -953,6 +1053,30 @@ export default function AssignTask() {
                   {doerOptions.map((doer, index) => (
                     <option key={index} value={doer}>
                       {doer}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Sub Category Dropdown */}
+              <div className="space-y-2">
+                <label
+                  htmlFor="subCategory"
+                  className="block text-sm font-medium text-purple-700"
+                >
+                  Sub Category
+                </label>
+                <select
+                  id="subCategory"
+                  name="subCategory"
+                  value={formData.subCategory}
+                  onChange={handleChange}
+                  className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                >
+                  <option value="">Select Sub Category</option>
+                  {subCategoryOptions.map((option, index) => (
+                    <option key={index} value={option}>
+                      {option}
                     </option>
                   ))}
                 </select>
@@ -1182,6 +1306,7 @@ export default function AssignTask() {
                                 </div>
                                 <div className="text-xs text-purple-600">
                                   Due: {formatDateForDisplay(task.dueDate)} | Department: {task.department}
+                                  {task.subCategory && <span className="block text-xs text-gray-500">Sub Category: {task.subCategory}</span>}
                                 </div>
                                 <div className="flex space-x-2 mt-1">
                                   {task.enableReminders && (
@@ -1221,6 +1346,7 @@ export default function AssignTask() {
                     department: "",
                     givenBy: "",
                     doer: "",
+                    subCategory: "",
                     description: "",
                     frequency: "One Time (No Recurrence)",
                     enableReminders: true,

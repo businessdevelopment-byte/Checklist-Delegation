@@ -213,11 +213,28 @@ const AllTasks = () => {
 
           console.log("Debug - Filtered Tasks:", filteredTasks);
 
-          const visibleHeaders = data.headers.filter((header, index) =>
+          const baseHeaders = data.headers.filter((header, index) =>
             index >= 1 && index <= 10
           )
 
-          setTableHeaders(visibleHeaders)
+          // Find Sub Category header (could be "Sub Category" or "SubCategory" or similar)
+          const subCategoryHeader = data.headers.find(h =>
+            h.label && (h.label === "Sub Category" || h.label === "SubCategory")
+          )
+
+          let finalHeaders = [...baseHeaders]
+
+          if (subCategoryHeader) {
+            // Try to put it after Department
+            const deptIndex = finalHeaders.findIndex(h => h.label === "Department")
+            if (deptIndex !== -1) {
+              finalHeaders.splice(deptIndex + 1, 0, subCategoryHeader)
+            } else {
+              finalHeaders.push(subCategoryHeader)
+            }
+          }
+
+          setTableHeaders(finalHeaders)
           setTasks(filteredTasks)
 
           setCurrentPage(1)
