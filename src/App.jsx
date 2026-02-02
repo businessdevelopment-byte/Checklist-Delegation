@@ -35,7 +35,7 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
 }
 
 function App() {
-  
+
 
   return (
     <Router>
@@ -68,11 +68,11 @@ function App() {
         />
 
 
-        {/* Assign Task route - only for admin */}
+        {/* Assign Task route - for admin and user */}
         <Route
           path="/dashboard/assign-task"
           element={
-            <ProtectedRoute allowedRoles={["admin"]}>
+            <ProtectedRoute allowedRoles={["admin", "user"]}>
               <AdminAssignTask />
             </ProtectedRoute>
           }
@@ -105,7 +105,7 @@ function App() {
             </ProtectedRoute>
           }
         />
-         <Route
+        <Route
           path="/dashboard/calendar"
           element={
             <ProtectedRoute>
@@ -149,7 +149,7 @@ function App() {
         <Route path="/admin/assign-task" element={<Navigate to="/dashboard/assign-task" replace />} />
         <Route path="/admin/delegation-task" element={<Navigate to="/dashboard/delegation-task" replace />} />
         <Route path="/admin/data/:category" element={<Navigate to="/dashboard/data/:category" replace />} />
-        <Route path="/admin/calendar" element={<Navigate to="/dashboard/calendar" replace/>}/>
+        <Route path="/admin/calendar" element={<Navigate to="/dashboard/calendar" replace />} />
         <Route path="/admin/license" element={<Navigate to="/dashboard/license" replace />} />
         <Route path="/admin/traning-video" element={<Navigate to="/dashboard/traning-video" replace />} />
         <Route path="/user/*" element={<Navigate to="/dashboard/admin" replace />} />
