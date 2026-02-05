@@ -85,7 +85,7 @@ function DelegationDataPage() {
   const [cameraError, setCameraError] = useState("");
   const [isCameraLoading, setIsCameraLoading] = useState(false);
   const [currentCaptureId, setCurrentCaptureId] = useState(null);
-
+  const [deletingRows, setDeletingRows] = useState(new Set());
 
   // Add these refs
   const videoRef = useRef(null);
@@ -95,7 +95,7 @@ function DelegationDataPage() {
   useEffect(() => {
     return () => {
       if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream.getTracks().forEach((track) => track.stop());
       }
     };
   }, [cameraStream]);
@@ -114,12 +114,14 @@ function DelegationDataPage() {
 
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'environment',
+          facingMode: "environment",
           width: { ideal: 1280 },
-          height: { ideal: 720 }
+          height: { ideal: 720 },
         },
-        audio: false
+        audio: false,
       });
+
+      // demo
 
       setCameraStream(stream);
       setIsCameraOpen(true);
@@ -166,15 +168,16 @@ function DelegationDataPage() {
 
         await videoRef.current.play();
       }
-
     } catch (error) {
       console.error("Camera error:", error);
 
-      if (error.name === 'NotAllowedError') {
-        setCameraError("Camera access denied. Please allow camera permissions.");
-      } else if (error.name === 'NotFoundError') {
+      if (error.name === "NotAllowedError") {
+        setCameraError(
+          "Camera access denied. Please allow camera permissions.",
+        );
+      } else if (error.name === "NotFoundError") {
         setCameraError("No camera found on this device.");
-      } else if (error.name === 'NotReadableError') {
+      } else if (error.name === "NotReadableError") {
         setCameraError("Camera is being used by another application.");
       } else {
         setCameraError("Unable to access camera: " + error.message);
@@ -186,7 +189,7 @@ function DelegationDataPage() {
 
   const stopCamera = () => {
     if (cameraStream) {
-      cameraStream.getTracks().forEach(track => {
+      cameraStream.getTracks().forEach((track) => {
         track.stop();
       });
       setCameraStream(null);
@@ -226,11 +229,11 @@ function DelegationDataPage() {
         return;
       }
 
-      const canvas = document.createElement('canvas');
+      const canvas = document.createElement("canvas");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
-      const context = canvas.getContext('2d');
+      const context = canvas.getContext("2d");
       if (!context) {
         alert("Failed to create canvas context");
         return;
@@ -247,23 +250,20 @@ function DelegationDataPage() {
               reject(new Error("Failed to create blob"));
             }
           },
-          'image/jpeg',
-          0.92
+          "image/jpeg",
+          0.92,
         );
       });
 
-      const file = new File(
-        [blob],
-        `camera-${Date.now()}.jpg`,
-        { type: 'image/jpeg' }
-      );
+      const file = new File([blob], `camera-${Date.now()}.jpg`, {
+        type: "image/jpeg",
+      });
 
       stopCamera();
 
       handleImageUpload(currentCaptureId, { target: { files: [file] } });
 
       alert("✅ Photo captured successfully!");
-
     } catch (error) {
       console.error("❌ Capture error:", error);
       alert("Failed to capture photo: " + error.message);
@@ -297,7 +297,7 @@ function DelegationDataPage() {
       date.getDate(),
       date.getHours(),
       date.getMinutes(),
-      date.getSeconds()
+      date.getSeconds(),
     );
   }, []);
 
@@ -319,7 +319,7 @@ function DelegationDataPage() {
         date.getDate(),
         date.getHours(),
         date.getMinutes(),
-        date.getSeconds()
+        date.getSeconds(),
       ),
       iso: date.toISOString(),
       googleSheetsValue: `=DATETIME(${year},${month},${day},${hours},${minutes},${seconds})`,
@@ -368,7 +368,7 @@ function DelegationDataPage() {
           day,
           currentDate.getHours(),
           currentDate.getMinutes(),
-          currentDate.getSeconds()
+          currentDate.getSeconds(),
         );
         if (!isNaN(date.getTime())) {
           return formatDateTimeForGoogleSheets(date);
@@ -385,7 +385,7 @@ function DelegationDataPage() {
           day,
           currentDate.getHours(),
           currentDate.getMinutes(),
-          currentDate.getSeconds()
+          currentDate.getSeconds(),
         );
         if (!isNaN(date.getTime())) {
           return formatDateTimeForGoogleSheets(date);
@@ -399,7 +399,7 @@ function DelegationDataPage() {
         googleSheetsValue: dateTimeString,
       };
     },
-    [formatDateTimeForGoogleSheets]
+    [formatDateTimeForGoogleSheets],
   );
 
   // NEW: Function to convert DD/MM/YYYY string to Google Sheets date format
@@ -432,7 +432,7 @@ function DelegationDataPage() {
         googleSheetsValue: dateString,
       };
     },
-    [formatDateForGoogleSheets]
+    [formatDateForGoogleSheets],
   );
 
   const isEmpty = useCallback((value) => {
@@ -491,7 +491,9 @@ function DelegationDataPage() {
 
       // Handle Google Sheets Date() format
       if (typeof dateTimeStr === "string" && dateTimeStr.startsWith("Date(")) {
-        const match = /Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)/.exec(dateTimeStr);
+        const match = /Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)/.exec(
+          dateTimeStr,
+        );
         if (match) {
           const year = Number.parseInt(match[1], 10);
           const month = Number.parseInt(match[2], 10);
@@ -530,7 +532,7 @@ function DelegationDataPage() {
       // If all else fails, return the original string
       return dateTimeStr;
     },
-    [formatDateTimeToDDMMYYYY, formatDateToDDMMYYYY]
+    [formatDateTimeToDDMMYYYY, formatDateToDDMMYYYY],
   );
 
   const parseGoogleSheetsDate = useCallback(
@@ -555,7 +557,9 @@ function DelegationDataPage() {
 
       // Handle Google Sheets Date() format
       if (typeof dateStr === "string" && dateStr.startsWith("Date(")) {
-        const match = /Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)/.exec(dateStr);
+        const match = /Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)/.exec(
+          dateStr,
+        );
         if (match) {
           const year = Number.parseInt(match[1], 10);
           const month = Number.parseInt(match[2], 10);
@@ -579,7 +583,7 @@ function DelegationDataPage() {
       // If all else fails, return the original string
       return dateStr;
     },
-    [formatDateToDDMMYYYY]
+    [formatDateToDDMMYYYY],
   );
 
   // NEW: Format datetime for display with support for both date and datetime
@@ -606,7 +610,7 @@ function DelegationDataPage() {
       // Try to parse and reformat
       return parseGoogleSheetsDateTime(dateTimeStr) || "—";
     },
-    [parseGoogleSheetsDateTime]
+    [parseGoogleSheetsDateTime],
   );
 
   const formatDateForDisplay = useCallback(
@@ -624,7 +628,7 @@ function DelegationDataPage() {
       // Try to parse and reformat
       return parseGoogleSheetsDate(dateStr) || "—";
     },
-    [parseGoogleSheetsDate]
+    [parseGoogleSheetsDate],
   );
 
   const parseDateFromDDMMYYYY = useCallback((dateStr) => {
@@ -661,7 +665,7 @@ function DelegationDataPage() {
         return false;
       }
     },
-    [formatDateToDDMMYYYY, parseDateFromDDMMYYYY]
+    [formatDateToDDMMYYYY, parseDateFromDDMMYYYY],
   );
 
   const sortDateWise = useCallback(
@@ -674,7 +678,7 @@ function DelegationDataPage() {
       if (!dateB) return -1;
       return dateA.getTime() - dateB.getTime();
     },
-    [parseDateFromDDMMYYYY]
+    [parseDateFromDDMMYYYY],
   );
 
   const resetFilters = useCallback(() => {
@@ -749,15 +753,15 @@ function DelegationDataPage() {
   const filteredAccountData = useMemo(() => {
     const filtered = debouncedSearchTerm
       ? accountData.filter((account) =>
-        Object.values(account).some(
-          (value) =>
-            value &&
-            value
-              .toString()
-              .toLowerCase()
-              .includes(debouncedSearchTerm.toLowerCase())
+          Object.values(account).some(
+            (value) =>
+              value &&
+              value
+                .toString()
+                .toLowerCase()
+                .includes(debouncedSearchTerm.toLowerCase()),
+          ),
         )
-      )
       : accountData;
 
     // Apply admin filters if user is admin
@@ -765,12 +769,12 @@ function DelegationDataPage() {
     if (userRole === "admin") {
       if (nameFilter) {
         adminFiltered = adminFiltered.filter(
-          (account) => account["col4"] === nameFilter
+          (account) => account["col4"] === nameFilter,
         );
       }
       if (departmentFilter) {
         adminFiltered = adminFiltered.filter(
-          (account) => account["col2"] === departmentFilter
+          (account) => account["col2"] === departmentFilter,
         );
       }
     }
@@ -799,13 +803,13 @@ function DelegationDataPage() {
 
         const matchesSearch = debouncedSearchTerm
           ? Object.values(item).some(
-            (value) =>
-              value &&
-              value
-                .toString()
-                .toLowerCase()
-                .includes(debouncedSearchTerm.toLowerCase())
-          )
+              (value) =>
+                value &&
+                value
+                  .toString()
+                  .toLowerCase()
+                  .includes(debouncedSearchTerm.toLowerCase()),
+            )
           : true;
 
         let matchesDateRange = true;
@@ -856,10 +860,10 @@ function DelegationDataPage() {
       // Parallel fetch both sheets for better performance
       const [mainResponse, historyResponse] = await Promise.all([
         fetch(
-          `${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.SOURCE_SHEET_NAME}&action=fetch&t=${Date.now()}`
+          `${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.SOURCE_SHEET_NAME}&action=fetch&t=${Date.now()}`,
         ),
         fetch(
-          `${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.TARGET_SHEET_NAME}&action=fetch&t=${Date.now()}`
+          `${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.TARGET_SHEET_NAME}&action=fetch&t=${Date.now()}`,
         ).catch(() => null),
       ]);
 
@@ -912,8 +916,8 @@ function DelegationDataPage() {
 
                 const rowValues = row.c
                   ? row.c.map((cell) =>
-                    cell && cell.v !== undefined ? cell.v : ""
-                  )
+                      cell && cell.v !== undefined ? cell.v : "",
+                    )
                   : [];
 
                 // Map all columns including column H (col7) for user filtering and column I (col8) for Task
@@ -967,7 +971,7 @@ function DelegationDataPage() {
         let rowValues = [];
         if (row.c) {
           rowValues = row.c.map((cell) =>
-            cell && cell.v !== undefined ? cell.v : ""
+            cell && cell.v !== undefined ? cell.v : "",
           );
         } else if (Array.isArray(row)) {
           rowValues = row;
@@ -997,8 +1001,8 @@ function DelegationDataPage() {
         const stableId = taskId
           ? `task_${taskId}_${googleSheetsRowIndex}`
           : `row_${googleSheetsRowIndex}_${Math.random()
-            .toString(36)
-            .substring(2, 15)}`;
+              .toString(36)
+              .substring(2, 15)}`;
 
         const rowData = {
           _id: stableId,
@@ -1075,7 +1079,7 @@ function DelegationDataPage() {
       const isChecked = e.target.checked;
       handleSelectItem(id, isChecked);
     },
-    [handleSelectItem]
+    [handleSelectItem],
   );
 
   const handleSelectAllItems = useCallback(
@@ -1100,7 +1104,7 @@ function DelegationDataPage() {
         setNextTargetDate({});
       }
     },
-    [filteredAccountData]
+    [filteredAccountData],
   );
 
   const handleImageUpload = useCallback(async (id, e) => {
@@ -1108,8 +1112,107 @@ function DelegationDataPage() {
     if (!file) return;
 
     setAccountData((prev) =>
-      prev.map((item) => (item._id === id ? { ...item, image: file } : item))
+      prev.map((item) => (item._id === id ? { ...item, image: file } : item)),
     );
+  }, []);
+
+  const handleDeleteRow = useCallback(async (account) => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this task? This action will remove the row permanently from the sheet.",
+      )
+    )
+      return;
+
+    // Ensure we have a row index to delete
+    if (!account || !account._rowIndex) {
+      alert("Cannot delete: missing row index for this record.");
+      return;
+    }
+
+    setDeletingRows((prev) => new Set([...prev, account._id]));
+
+    try {
+      // Try multiple action names and both POST and GET methods to accommodate variations
+      const actions = [
+        "deleteRow",
+        "removeRow",
+        "delete",
+        "deleteByRowIndex",
+        "deleteByTaskId",
+        "removeByTaskId",
+      ];
+
+      const parseResponse = async (response) => {
+        const text = await response.text();
+        console.debug("Delete response text:", text);
+        try {
+          return JSON.parse(text);
+        } catch (e) {
+          return { success: response.ok, text };
+        }
+      };
+
+      let res = null;
+
+      // Try POST with form data for each action
+      for (const action of actions) {
+        const formData = new FormData();
+        // include both keys for compatibility with different server implementations
+        formData.append("sheetName", CONFIG.SOURCE_SHEET_NAME);
+        formData.append("sheet", CONFIG.SOURCE_SHEET_NAME);
+        formData.append("action", action);
+        formData.append("rowIndex", String(account._rowIndex));
+        formData.append("rowNumber", String(account._rowIndex));
+        formData.append("index", String(account._rowIndex));
+        formData.append("taskId", account._taskId || account["col1"] || "");
+        formData.append("rowData", JSON.stringify(account));
+
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+          method: "POST",
+          body: formData,
+        });
+
+        res = await parseResponse(response);
+        if (res && res.success) {
+          console.debug("Delete POST succeeded with action:", action);
+          break;
+        }
+      }
+
+      // If still not successful, try GET fallback for each action
+      if (!res || !res.success) {
+        for (const action of actions) {
+          const url = `${CONFIG.APPS_SCRIPT_URL}?action=${encodeURIComponent(action)}&sheet=${encodeURIComponent(CONFIG.SOURCE_SHEET_NAME)}&rowIndex=${encodeURIComponent(account._rowIndex)}&taskId=${encodeURIComponent(account._taskId || account["col1"] || "")}&t=${Date.now()}`;
+          const getResp = await fetch(url);
+          res = await parseResponse(getResp);
+          if (res && res.success) {
+            console.debug("Delete GET succeeded with action:", action);
+            break;
+          }
+        }
+      }
+
+      if (!res || !res.success) {
+        const errMsg =
+          (res && (res.error || res.message || res.text)) ||
+          "Server failed to delete row";
+        throw new Error(errMsg);
+      }
+
+      // Remove from UI
+      setAccountData((prev) => prev.filter((item) => item._id !== account._id));
+      setSuccessMessage("Row deleted successfully.");
+    } catch (error) {
+      console.error("Delete failed:", error);
+      alert("Delete failed: " + (error.message || "Server error"));
+    } finally {
+      setDeletingRows((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(account._id);
+        return newSet;
+      });
+    }
   }, []);
 
   const handleStatusChange = useCallback((id, value) => {
@@ -1152,17 +1255,17 @@ function DelegationDataPage() {
     const missingStatus = selectedItemsArray.filter((id) => !statusData[id]);
     if (missingStatus.length > 0) {
       alert(
-        `Please select a status for all selected items. ${missingStatus.length} item(s) are missing status.`
+        `Please select a status for all selected items. ${missingStatus.length} item(s) are missing status.`,
       );
       return;
     }
 
     const missingNextDate = selectedItemsArray.filter(
-      (id) => statusData[id] === "Extend date" && !nextTargetDate[id]
+      (id) => statusData[id] === "Extend date" && !nextTargetDate[id],
     );
     if (missingNextDate.length > 0) {
       alert(
-        `Please select a next target date for all items with "Extend date" status. ${missingNextDate.length} item(s) are missing target date.`
+        `Please select a next target date for all items with "Extend date" status. ${missingNextDate.length} item(s) are missing target date.`,
       );
       return;
     }
@@ -1176,7 +1279,7 @@ function DelegationDataPage() {
 
     if (missingRequiredImages.length > 0) {
       alert(
-        `Please upload images for all required attachments. ${missingRequiredImages.length} item(s) are missing required images.`
+        `Please upload images for all required attachments. ${missingRequiredImages.length} item(s) are missing required images.`,
       );
       return;
     }
@@ -1209,7 +1312,7 @@ function DelegationDataPage() {
                   "fileName",
                   `task_${item["col1"]}_${Date.now()}.${item.image.name
                     .split(".")
-                    .pop()}`
+                    .pop()}`,
                 );
                 uploadFormData.append("mimeType", item.image.type);
                 uploadFormData.append("folderId", CONFIG.DRIVE_FOLDER_ID);
@@ -1235,7 +1338,7 @@ function DelegationDataPage() {
 
             if (nextTargetDate[id]) {
               const convertedDateTime = convertToGoogleSheetsDateTime(
-                nextTargetDate[id]
+                nextTargetDate[id],
               );
               formattedNextTargetDateTime = convertedDateTime.formatted;
               nextTargetDateTimeForGoogleSheets = convertedDateTime.dateObject;
@@ -1254,8 +1357,8 @@ function DelegationDataPage() {
               item["col5"] || "", // Column I - Task description from col5
 
               item["col3"] || "", // Column J - Given By from original task
-              "",                 // Column K - Empty
-              "",                 // Column L - Empty
+              "", // Column K - Empty
+              "", // Column L - Empty
               item["col21"] || "", // Column M - Sub Category from col21
             ];
 
@@ -1278,14 +1381,14 @@ function DelegationDataPage() {
             };
             insertFormData.append(
               "dateTimeMetadata",
-              JSON.stringify(dateTimeMetadata)
+              JSON.stringify(dateTimeMetadata),
             );
 
             // If we have a proper datetime object for next target date, send it separately
             if (nextTargetDateTimeForGoogleSheets) {
               insertFormData.append(
                 "nextTargetDateTimeObject",
-                nextTargetDateTimeForGoogleSheets.toISOString()
+                nextTargetDateTimeForGoogleSheets.toISOString(),
               );
             }
 
@@ -1293,16 +1396,16 @@ function DelegationDataPage() {
               method: "POST",
               body: insertFormData,
             });
-          })
+          }),
         );
       }
 
       setAccountData((prev) =>
-        prev.filter((item) => !selectedItems.has(item._id))
+        prev.filter((item) => !selectedItems.has(item._id)),
       );
 
       setSuccessMessage(
-        `Successfully processed ${selectedItemsArray.length} task records! Data submitted to ${CONFIG.TARGET_SHEET_NAME} sheet.`
+        `Successfully processed ${selectedItemsArray.length} task records! Data submitted to ${CONFIG.TARGET_SHEET_NAME} sheet.`,
       );
       setSelectedItems(new Set());
       setAdditionalData({});
@@ -1327,15 +1430,15 @@ function DelegationDataPage() {
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-
           {/* PAGE TITLE */}
           <h1 className="text-2xl font-bold tracking-tight text-purple-700 text-center sm:text-left">
-            {showHistory ? CONFIG.PAGE_CONFIG.historyTitle : CONFIG.PAGE_CONFIG.title}
+            {showHistory
+              ? CONFIG.PAGE_CONFIG.historyTitle
+              : CONFIG.PAGE_CONFIG.title}
           </h1>
 
           {/* SEARCH + FILTER + BUTTONS WRAPPER */}
           <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
-
             {/* SEARCH BOX */}
             <div className="relative w-full sm:w-64">
               <Search
@@ -1344,7 +1447,9 @@ function DelegationDataPage() {
               />
               <input
                 type="text"
-                placeholder={showHistory ? "Search by Task ID..." : "Search tasks..."}
+                placeholder={
+                  showHistory ? "Search by Task ID..." : "Search tasks..."
+                }
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-purple-200 rounded-md 
@@ -1355,7 +1460,6 @@ function DelegationDataPage() {
             {/* ADMIN FILTERS */}
             {userRole === "admin" && !showHistory && (
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto">
-
                 {/* NAME FILTER */}
                 <div className="relative w-full sm:w-auto">
                   <button
@@ -1367,21 +1471,25 @@ function DelegationDataPage() {
                     {nameFilter || "Filter by Name"}
                     <ChevronDown
                       size={16}
-                      className={`transition-transform ${dropdownOpen.name ? "rotate-180" : ""
-                        }`}
+                      className={`transition-transform ${
+                        dropdownOpen.name ? "rotate-180" : ""
+                      }`}
                     />
                   </button>
 
                   {dropdownOpen.name && (
-                    <div className="absolute z-50 mt-1 w-full sm:w-56 rounded-md bg-white shadow-lg 
-                            border border-gray-200 max-h-60 overflow-auto">
+                    <div
+                      className="absolute z-50 mt-1 w-full sm:w-56 rounded-md bg-white shadow-lg 
+                            border border-gray-200 max-h-60 overflow-auto"
+                    >
                       <div className="py-1">
                         <button
                           onClick={clearNameFilter}
-                          className={`block w-full text-left px-4 py-2 text-sm ${!nameFilter
-                            ? "bg-purple-100 text-purple-900"
-                            : "text-gray-700 hover:bg-gray-100"
-                            }`}
+                          className={`block w-full text-left px-4 py-2 text-sm ${
+                            !nameFilter
+                              ? "bg-purple-100 text-purple-900"
+                              : "text-gray-700 hover:bg-gray-100"
+                          }`}
                         >
                           All Names
                         </button>
@@ -1390,10 +1498,11 @@ function DelegationDataPage() {
                           <button
                             key={name}
                             onClick={() => handleNameFilterSelect(name)}
-                            className={`block w-full text-left px-4 py-2 text-sm ${nameFilter === name
-                              ? "bg-purple-100 text-purple-900"
-                              : "text-gray-700 hover:bg-gray-100"
-                              }`}
+                            className={`block w-full text-left px-4 py-2 text-sm ${
+                              nameFilter === name
+                                ? "bg-purple-100 text-purple-900"
+                                : "text-gray-700 hover:bg-gray-100"
+                            }`}
                           >
                             {name}
                           </button>
@@ -1414,21 +1523,25 @@ function DelegationDataPage() {
                     {departmentFilter || "Filter by Department"}
                     <ChevronDown
                       size={16}
-                      className={`transition-transform ${dropdownOpen.department ? "rotate-180" : ""
-                        }`}
+                      className={`transition-transform ${
+                        dropdownOpen.department ? "rotate-180" : ""
+                      }`}
                     />
                   </button>
 
                   {dropdownOpen.department && (
-                    <div className="absolute z-50 mt-1 w-full sm:w-48 rounded-md bg-white shadow-lg 
-                            border border-gray-200 max-h-48 overflow-auto">
+                    <div
+                      className="absolute z-50 mt-1 w-full sm:w-48 rounded-md bg-white shadow-lg 
+                            border border-gray-200 max-h-48 overflow-auto"
+                    >
                       <div className="py-1">
                         <button
                           onClick={clearDepartmentFilter}
-                          className={`block w-full text-left px-3 py-2 text-sm ${!departmentFilter
-                            ? "bg-purple-100 text-purple-900"
-                            : "text-gray-700 hover:bg-gray-100"
-                            }`}
+                          className={`block w-full text-left px-3 py-2 text-sm ${
+                            !departmentFilter
+                              ? "bg-purple-100 text-purple-900"
+                              : "text-gray-700 hover:bg-gray-100"
+                          }`}
                         >
                           All Departments
                         </button>
@@ -1437,10 +1550,11 @@ function DelegationDataPage() {
                           <button
                             key={dept}
                             onClick={() => handleDepartmentFilterSelect(dept)}
-                            className={`block w-full text-left px-3 py-2 text-sm ${departmentFilter === dept
-                              ? "bg-purple-100 text-purple-900"
-                              : "text-gray-700 hover:bg-gray-100"
-                              }`}
+                            className={`block w-full text-left px-3 py-2 text-sm ${
+                              departmentFilter === dept
+                                ? "bg-purple-100 text-purple-900"
+                                : "text-gray-700 hover:bg-gray-100"
+                            }`}
                           >
                             {dept}
                           </button>
@@ -1489,10 +1603,8 @@ function DelegationDataPage() {
                   : `Submit Selected (${selectedItemsCount})`}
               </button>
             )}
-
           </div>
         </div>
-
 
         {successMessage && (
           <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md flex items-center justify-between">
@@ -1518,8 +1630,9 @@ function DelegationDataPage() {
             </h2>
             <p className="text-purple-600 text-sm">
               {showHistory
-                ? `${CONFIG.PAGE_CONFIG.historyDescription} for ${userRole === "admin" ? "all" : "your"
-                } tasks`
+                ? `${CONFIG.PAGE_CONFIG.historyDescription} for ${
+                    userRole === "admin" ? "all" : "your"
+                  } tasks`
                 : CONFIG.PAGE_CONFIG.description}
             </p>
           </div>
@@ -1663,12 +1776,13 @@ function DelegationDataPage() {
                           </td>
                           <td className="px-6 py-4 min-w-[100px]">
                             <span
-                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full whitespace-normal ${history["col2"] === "Done"
-                                ? "bg-green-100 text-green-800"
-                                : history["col2"] === "Extend date"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-gray-100 text-gray-800"
-                                }`}
+                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full whitespace-normal ${
+                                history["col2"] === "Done"
+                                  ? "bg-green-100 text-green-800"
+                                  : history["col2"] === "Extend date"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-gray-100 text-gray-800"
+                              }`}
                             >
                               {history["col2"] || "—"}
                             </span>
@@ -1786,12 +1900,13 @@ function DelegationDataPage() {
                             Status:
                           </span>
                           <span
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${history["col2"] === "Done"
-                              ? "bg-green-100 text-green-800"
-                              : history["col2"] === "Extend date"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-gray-100 text-gray-800"
-                              }`}
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              history["col2"] === "Done"
+                                ? "bg-green-100 text-green-800"
+                                : history["col2"] === "Extend date"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-gray-100 text-gray-800"
+                            }`}
                           >
                             {history["col2"] || "—"}
                           </span>
@@ -1915,40 +2030,49 @@ function DelegationDataPage() {
                         Task Description
                       </th>
                       <th
-                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px] ${!accountData["col17"] ? "bg-yellow-50" : ""
-                          }`}
+                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px] ${
+                          !accountData["col17"] ? "bg-yellow-50" : ""
+                        }`}
                       >
                         Task End Date
                       </th>
                       <th
-                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px] ${!accountData["col17"] ? "bg-green-50" : ""
-                          }`}
+                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px] ${
+                          !accountData["col17"] ? "bg-green-50" : ""
+                        }`}
                       >
                         Planned Date
                       </th>
                       <th
-                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] ${!accountData["col17"] ? "bg-blue-50" : ""
-                          }`}
+                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] ${
+                          !accountData["col17"] ? "bg-blue-50" : ""
+                        }`}
                       >
                         Status
                       </th>
                       <th
-                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px] ${!accountData["col17"] ? "bg-indigo-50" : ""
-                          }`}
+                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px] ${
+                          !accountData["col17"] ? "bg-indigo-50" : ""
+                        }`}
                       >
                         Next Target Date
                       </th>
                       <th
-                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px] ${!accountData["col17"] ? "bg-purple-50" : ""
-                          }`}
+                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px] ${
+                          !accountData["col17"] ? "bg-purple-50" : ""
+                        }`}
                       >
                         Remarks
                       </th>
                       <th
-                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] ${!accountData["col17"] ? "bg-orange-50" : ""
-                          }`}
+                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] ${
+                          !accountData["col17"] ? "bg-orange-50" : ""
+                        }`}
                       >
                         Upload Image
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
+                        Delete
                       </th>
                     </tr>
                   </thead>
@@ -1961,7 +2085,6 @@ function DelegationDataPage() {
                         const rowColorClass = getRowColor(account["col17"]);
                         const taskStatus = statusData[account._id] || "";
                         const isTodayTask = isToday(account["col6"]);
-
 
                         return (
                           <tr
@@ -2021,24 +2144,27 @@ function DelegationDataPage() {
                               </div>
                             </td>
                             <td
-                              className={`px-6 py-4 min-w-[140px] ${!account["col17"] ? "bg-yellow-50" : ""
-                                }`}
+                              className={`px-6 py-4 min-w-[140px] ${
+                                !account["col17"] ? "bg-yellow-50" : ""
+                              }`}
                             >
                               <div className="text-sm text-gray-900 whitespace-normal break-words">
                                 {formatDateTimeForDisplay(account["col6"])}
                               </div>
                             </td>
                             <td
-                              className={`px-6 py-4 min-w-[140px] ${!account["col17"] ? "bg-green-50" : ""
-                                }`}
+                              className={`px-6 py-4 min-w-[140px] ${
+                                !account["col17"] ? "bg-green-50" : ""
+                              }`}
                             >
                               <div className="text-sm text-gray-900 whitespace-normal break-words">
                                 {formatDateTimeForDisplay(account["col10"])}
                               </div>
                             </td>
                             <td
-                              className={`px-6 py-4 min-w-[120px] ${!account["col17"] ? "bg-blue-50" : ""
-                                }`}
+                              className={`px-6 py-4 min-w-[120px] ${
+                                !account["col17"] ? "bg-blue-50" : ""
+                              }`}
                             >
                               <select
                                 disabled={!isSelected}
@@ -2046,7 +2172,7 @@ function DelegationDataPage() {
                                 onChange={(e) =>
                                   handleStatusChange(
                                     account._id,
-                                    e.target.value
+                                    e.target.value,
                                   )
                                 }
                                 className="border border-gray-300 rounded-md px-2 py-1 w-full disabled:bg-gray-100 disabled:cursor-not-allowed text-sm"
@@ -2057,8 +2183,9 @@ function DelegationDataPage() {
                               </select>
                             </td>
                             <td
-                              className={`px-6 py-4 min-w-[140px] ${!account["col17"] ? "bg-indigo-50" : ""
-                                }`}
+                              className={`px-6 py-4 min-w-[140px] ${
+                                !account["col17"] ? "bg-indigo-50" : ""
+                              }`}
                             >
                               <input
                                 type="date"
@@ -2069,20 +2196,20 @@ function DelegationDataPage() {
                                 value={
                                   nextTargetDate[account._id]
                                     ? (() => {
-                                      const dateStr =
-                                        nextTargetDate[account._id];
-                                      if (dateStr && dateStr.includes("/")) {
-                                        const datePart =
-                                          dateStr.split(" ")[0]; // Get only date part if datetime
-                                        const [day, month, year] =
-                                          datePart.split("/");
-                                        return `${year}-${month.padStart(
-                                          2,
-                                          "0"
-                                        )}-${day.padStart(2, "0")}`;
-                                      }
-                                      return dateStr;
-                                    })()
+                                        const dateStr =
+                                          nextTargetDate[account._id];
+                                        if (dateStr && dateStr.includes("/")) {
+                                          const datePart =
+                                            dateStr.split(" ")[0]; // Get only date part if datetime
+                                          const [day, month, year] =
+                                            datePart.split("/");
+                                          return `${year}-${month.padStart(
+                                            2,
+                                            "0",
+                                          )}-${day.padStart(2, "0")}`;
+                                        }
+                                        return dateStr;
+                                      })()
                                     : ""
                                 }
                                 onChange={(e) => {
@@ -2107,7 +2234,7 @@ function DelegationDataPage() {
                                     const formattedDateTime = `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
                                     handleNextTargetDateChange(
                                       account._id,
-                                      formattedDateTime
+                                      formattedDateTime,
                                     );
                                   } else {
                                     handleNextTargetDateChange(account._id, "");
@@ -2117,8 +2244,9 @@ function DelegationDataPage() {
                               />
                             </td>
                             <td
-                              className={`px-6 py-4 min-w-[200px] max-w-[250px] ${!account["col17"] ? "bg-purple-50" : ""
-                                }`}
+                              className={`px-6 py-4 min-w-[200px] max-w-[250px] ${
+                                !account["col17"] ? "bg-purple-50" : ""
+                              }`}
                             >
                               <textarea
                                 placeholder="Enter remarks"
@@ -2154,11 +2282,15 @@ function DelegationDataPage() {
                                         : "Uploaded Receipt"}
                                     </span>
                                     {account.image instanceof File ? (
-                                      <span className="text-xs text-green-600">Ready to upload</span>
+                                      <span className="text-xs text-green-600">
+                                        Ready to upload
+                                      </span>
                                     ) : (
                                       <button
                                         className="text-xs text-purple-600 hover:text-purple-800"
-                                        onClick={() => window.open(account.image, "_blank")}
+                                        onClick={() =>
+                                          window.open(account.image, "_blank")
+                                        }
                                       >
                                         View Full Image
                                       </button>
@@ -2169,18 +2301,22 @@ function DelegationDataPage() {
                                 <div className="flex flex-col gap-2">
                                   <label
                                     htmlFor={`upload-${account._id}`}
-                                    className={`flex items-center cursor-pointer ${account["col9"]?.toUpperCase() === "YES"
-                                      ? "text-red-600 font-medium"
-                                      : "text-purple-600 hover:text-purple-800"
-                                      } ${isDisabled ? "pointer-events-none opacity-50" : ""}`}
+                                    className={`flex items-center cursor-pointer ${
+                                      account["col9"]?.toUpperCase() === "YES"
+                                        ? "text-red-600 font-medium"
+                                        : "text-purple-600 hover:text-purple-800"
+                                    } ${isDisabled ? "pointer-events-none opacity-50" : ""}`}
                                   >
                                     <Upload className="h-4 w-4 mr-1" />
                                     <span className="text-xs">
                                       {account["col9"]?.toUpperCase() === "YES"
                                         ? "Required Upload"
                                         : "Upload Image"}
-                                      {account["col9"]?.toUpperCase() === "YES" && (
-                                        <span className="text-red-500 ml-1">*</span>
+                                      {account["col9"]?.toUpperCase() ===
+                                        "YES" && (
+                                        <span className="text-red-500 ml-1">
+                                          *
+                                        </span>
                                       )}
                                     </span>
                                   </label>
@@ -2190,7 +2326,9 @@ function DelegationDataPage() {
                                     type="file"
                                     className="hidden"
                                     accept="image/*"
-                                    onChange={(e) => handleImageUpload(account._id, e)}
+                                    onChange={(e) =>
+                                      handleImageUpload(account._id, e)
+                                    }
                                     disabled={!isSelected || isDisabled}
                                   />
 
@@ -2203,10 +2341,28 @@ function DelegationDataPage() {
                                     className="flex items-center text-blue-600 hover:text-blue-800 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
                                     <Camera className="h-4 w-4 mr-1" />
-                                    <span>{isCameraLoading ? "Loading..." : "Take Photo"}</span>
+                                    <span>
+                                      {isCameraLoading
+                                        ? "Loading..."
+                                        : "Take Photo"}
+                                    </span>
                                   </button>
                                 </div>
                               )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteRow(account);
+                                }}
+                                disabled={deletingRows.has(account._id)}
+                                className="text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50"
+                              >
+                                {deletingRows.has(account._id)
+                                  ? "Deleting..."
+                                  : "Delete"}
+                              </button>
                             </td>
                           </tr>
                         );
@@ -2239,9 +2395,12 @@ function DelegationDataPage() {
                     const isTodayTask = isToday(account["col6"]);
 
                     return (
-                      <div key={account._id} className={`bg-white border border-gray-200 rounded-lg p-4 shadow-sm ${isSelected ? "bg-purple-50 border-purple-200" : ""
-                        } ${rowColorClass}`}>
-
+                      <div
+                        key={account._id}
+                        className={`bg-white border border-gray-200 rounded-lg p-4 shadow-sm ${
+                          isSelected ? "bg-purple-50 border-purple-200" : ""
+                        } ${rowColorClass}`}
+                      >
                         {/* TODAY Badge */}
                         {isTodayTask && (
                           <div className="bg-amber-500 text-white text-xs font-bold px-3 py-1 rounded-md shadow-md mb-3 text-center">
@@ -2252,18 +2411,24 @@ function DelegationDataPage() {
                         <div className="space-y-3">
                           {/* Checkbox */}
                           <div className="flex justify-between items-center border-b pb-2">
-                            <span className="font-medium text-gray-700">Select:</span>
+                            <span className="font-medium text-gray-700">
+                              Select:
+                            </span>
                             <input
                               type="checkbox"
                               className="h-5 w-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                               checked={isSelected}
-                              onChange={(e) => handleCheckboxClick(e, account._id)}
+                              onChange={(e) =>
+                                handleCheckboxClick(e, account._id)
+                              }
                             />
                           </div>
 
                           {/* Task ID */}
                           <div className="flex justify-between items-center border-b pb-2">
-                            <span className="font-medium text-gray-700">Task ID:</span>
+                            <span className="font-medium text-gray-700">
+                              Task ID:
+                            </span>
                             <div className="text-sm text-gray-900 break-words">
                               {account["col1"] || "—"}
                             </div>
@@ -2271,7 +2436,9 @@ function DelegationDataPage() {
 
                           {/* Department */}
                           <div className="flex justify-between items-center border-b pb-2">
-                            <span className="font-medium text-gray-700">Department:</span>
+                            <span className="font-medium text-gray-700">
+                              Department:
+                            </span>
                             <div className="text-sm text-gray-900 break-words">
                               {account["col2"] || "—"}
                             </div>
@@ -2279,7 +2446,9 @@ function DelegationDataPage() {
 
                           {/* Given By */}
                           <div className="flex justify-between items-center border-b pb-2">
-                            <span className="font-medium text-gray-700">Given By:</span>
+                            <span className="font-medium text-gray-700">
+                              Given By:
+                            </span>
                             <div className="text-sm text-gray-900 break-words">
                               {account["col3"] || "—"}
                             </div>
@@ -2287,7 +2456,9 @@ function DelegationDataPage() {
 
                           {/* Name */}
                           <div className="flex justify-between items-center border-b pb-2">
-                            <span className="font-medium text-gray-700">Name:</span>
+                            <span className="font-medium text-gray-700">
+                              Name:
+                            </span>
                             <div className="text-sm text-gray-900 break-words">
                               {account["col4"] || "—"}
                             </div>
@@ -2295,7 +2466,9 @@ function DelegationDataPage() {
 
                           {/* Description */}
                           <div className="flex justify-between items-start border-b pb-2">
-                            <span className="font-medium text-gray-700">Description:</span>
+                            <span className="font-medium text-gray-700">
+                              Description:
+                            </span>
                             <div className="text-sm text-gray-900 break-words text-right max-w-[60%]">
                               {account["col5"] || "—"}
                             </div>
@@ -2303,7 +2476,9 @@ function DelegationDataPage() {
 
                           {/* End Date */}
                           <div className="flex justify-between items-center border-b pb-2">
-                            <span className="font-medium text-gray-700">End Date:</span>
+                            <span className="font-medium text-gray-700">
+                              End Date:
+                            </span>
                             <div className="text-sm text-gray-900 break-words">
                               {formatDateTimeForDisplay(account["col6"])}
                             </div>
@@ -2311,7 +2486,9 @@ function DelegationDataPage() {
 
                           {/* Planned Date */}
                           <div className="flex justify-between items-center border-b pb-2">
-                            <span className="font-medium text-gray-700">Planned Date:</span>
+                            <span className="font-medium text-gray-700">
+                              Planned Date:
+                            </span>
                             <div className="text-sm text-gray-900 break-words">
                               {formatDateTimeForDisplay(account["col10"])}
                             </div>
@@ -2319,11 +2496,15 @@ function DelegationDataPage() {
 
                           {/* Status */}
                           <div className="flex justify-between items-center border-b pb-2">
-                            <span className="font-medium text-gray-700">Status:</span>
+                            <span className="font-medium text-gray-700">
+                              Status:
+                            </span>
                             <select
                               disabled={!isSelected}
                               value={taskStatus}
-                              onChange={(e) => handleStatusChange(account._id, e.target.value)}
+                              onChange={(e) =>
+                                handleStatusChange(account._id, e.target.value)
+                              }
                               className="border border-gray-300 rounded-md px-2 py-1 disabled:bg-gray-100 disabled:cursor-not-allowed text-sm"
                             >
                               <option value="">Select</option>
@@ -2334,30 +2515,40 @@ function DelegationDataPage() {
 
                           {/* Next Target Date */}
                           <div className="flex justify-between items-center border-b pb-2">
-                            <span className="font-medium text-gray-700">Next Target Date:</span>
+                            <span className="font-medium text-gray-700">
+                              Next Target Date:
+                            </span>
                             <input
                               type="date"
-                              disabled={!isSelected || taskStatus !== "Extend date"}
+                              disabled={
+                                !isSelected || taskStatus !== "Extend date"
+                              }
                               value={
                                 nextTargetDate[account._id]
                                   ? (() => {
-                                    const dateStr = nextTargetDate[account._id];
-                                    if (dateStr && dateStr.includes("/")) {
-                                      const datePart = dateStr.split(" ")[0];
-                                      const [day, month, year] = datePart.split("/");
-                                      return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-                                    }
-                                    return dateStr;
-                                  })()
+                                      const dateStr =
+                                        nextTargetDate[account._id];
+                                      if (dateStr && dateStr.includes("/")) {
+                                        const datePart = dateStr.split(" ")[0];
+                                        const [day, month, year] =
+                                          datePart.split("/");
+                                        return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+                                      }
+                                      return dateStr;
+                                    })()
                                   : ""
                               }
                               onChange={(e) => {
                                 const inputDate = e.target.value;
                                 if (inputDate) {
-                                  const [year, month, day] = inputDate.split("-");
+                                  const [year, month, day] =
+                                    inputDate.split("-");
                                   const currentTime = new Date();
                                   const formattedDateTime = `${day}/${month}/${year} ${currentTime.getHours().toString().padStart(2, "0")}:${currentTime.getMinutes().toString().padStart(2, "0")}:${currentTime.getSeconds().toString().padStart(2, "0")}`;
-                                  handleNextTargetDateChange(account._id, formattedDateTime);
+                                  handleNextTargetDateChange(
+                                    account._id,
+                                    formattedDateTime,
+                                  );
                                 }
                               }}
                               className="border border-gray-300 rounded-md px-2 py-1 disabled:bg-gray-100 disabled:cursor-not-allowed text-sm"
@@ -2366,12 +2557,19 @@ function DelegationDataPage() {
 
                           {/* Remarks */}
                           <div className="flex justify-between items-start border-b pb-2">
-                            <span className="font-medium text-gray-700">Remarks:</span>
+                            <span className="font-medium text-gray-700">
+                              Remarks:
+                            </span>
                             <textarea
                               placeholder="Enter remarks"
                               disabled={!isSelected}
                               value={remarksData[account._id] || ""}
-                              onChange={(e) => setRemarksData((prev) => ({ ...prev, [account._id]: e.target.value }))}
+                              onChange={(e) =>
+                                setRemarksData((prev) => ({
+                                  ...prev,
+                                  [account._id]: e.target.value,
+                                }))
+                              }
                               className="border rounded-md px-2 py-1 border-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed text-sm resize-none w-32"
                               rows="2"
                             />
@@ -2393,14 +2591,20 @@ function DelegationDataPage() {
                                 />
                                 <div className="flex flex-col">
                                   <span className="text-xs text-gray-500">
-                                    {account.image instanceof File ? account.image.name : "Uploaded Receipt"}
+                                    {account.image instanceof File
+                                      ? account.image.name
+                                      : "Uploaded Receipt"}
                                   </span>
                                   {account.image instanceof File ? (
-                                    <span className="text-xs text-green-600">Ready to upload</span>
+                                    <span className="text-xs text-green-600">
+                                      Ready to upload
+                                    </span>
                                   ) : (
                                     <button
                                       className="text-xs text-purple-600 hover:text-purple-800"
-                                      onClick={() => window.open(account.image, "_blank")}
+                                      onClick={() =>
+                                        window.open(account.image, "_blank")
+                                      }
                                     >
                                       View Full Image
                                     </button>
@@ -2416,31 +2620,58 @@ function DelegationDataPage() {
                                     startCamera();
                                   }}
                                   disabled={!isSelected || isDisabled}
-                                  className={`flex items-center px-3 py-2 rounded-lg border-2 text-sm font-medium ${isSelected ? "bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 shadow-md" : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
-                                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                  className={`flex items-center px-3 py-2 rounded-lg border-2 text-sm font-medium ${
+                                    isSelected
+                                      ? "bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 shadow-md"
+                                      : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
+                                  } disabled:opacity-50 disabled:cursor-not-allowed`}
                                 >
                                   <Camera className="h-4 w-4 mr-1" />
                                   <span>Camera</span>
                                 </button>
 
-                                <label className={`flex items-center px-3 py-2 rounded-lg border-2 text-sm font-medium ${isSelected
-                                  ? account["col9"]?.toUpperCase() === "YES"
-                                    ? "bg-red-50 border-red-300 text-red-700 hover:bg-red-100 shadow-md"
-                                    : "bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100 shadow-md"
-                                  : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
-                                  }`}>
+                                <label
+                                  className={`flex items-center px-3 py-2 rounded-lg border-2 text-sm font-medium ${
+                                    isSelected
+                                      ? account["col9"]?.toUpperCase() === "YES"
+                                        ? "bg-red-50 border-red-300 text-red-700 hover:bg-red-100 shadow-md"
+                                        : "bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100 shadow-md"
+                                      : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
+                                  }`}
+                                >
                                   <Upload className="h-4 w-4 mr-1" />
-                                  <span>{account["col9"]?.toUpperCase() === "YES" ? "Required*" : "Gallery"}</span>
+                                  <span>
+                                    {account["col9"]?.toUpperCase() === "YES"
+                                      ? "Required*"
+                                      : "Gallery"}
+                                  </span>
                                   <input
                                     type="file"
                                     className="hidden"
                                     accept="image/*"
-                                    onChange={(e) => handleImageUpload(account._id, e)}
+                                    onChange={(e) =>
+                                      handleImageUpload(account._id, e)
+                                    }
                                     disabled={!isSelected || isDisabled}
                                   />
                                 </label>
                               </div>
                             )}
+                          </div>
+                          <div className="mt-3">
+                            <button
+                              onClick={() => {
+                                if (!isSelected) return;
+                                if (!confirm("Delete permanently?")) return;
+                                handleDeleteRow(account);
+                              }}
+                              disabled={deletingRows.has(account._id)}
+                              className="w-full py-2 rounded-lg border-2 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50"
+                            >
+                              {deletingRows.has(account._id)
+                                ? "Deleting..."
+                                : "Delete Task"}
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -2452,7 +2683,6 @@ function DelegationDataPage() {
                   </div>
                 )}
               </div>
-
             </>
           )}
         </div>

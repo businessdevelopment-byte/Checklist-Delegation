@@ -1,5 +1,12 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo, useRef, captureBtnRef } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  captureBtnRef,
+} from "react";
 import {
   CheckCircle2,
   Upload,
@@ -11,7 +18,6 @@ import {
   Save,
   XCircle,
   Camera,
-
 } from "lucide-react";
 import AdminLayout from "../../components/layout/AdminLayout";
 
@@ -70,6 +76,7 @@ function AccountDataPage() {
   const [buddyTaskFilter, setBuddyTaskFilter] = useState(""); // Selected buddy name
   const [assignedPersons, setAssignedPersons] = useState([]); // List from sessionStorage
   const [currentCaptureId, setCurrentCaptureId] = useState(null);
+  const [deletingRows, setDeletingRows] = useState(new Set());
   // Ye states already hai aapke code me (around line 50-60), check karo ye sab exist karte hai:
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraStream, setCameraStream] = useState(null);
@@ -80,13 +87,11 @@ function AccountDataPage() {
   const [isCameraLoading, setIsCameraLoading] = useState(false); // ✅ Ye line check karo
   // Add these functions in your component (around line 150-250, after other functions)
 
-
-
   // Camera cleanup when component unmounts
   useEffect(() => {
     return () => {
       if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream.getTracks().forEach((track) => track.stop());
       }
     };
   }, [cameraStream]);
@@ -110,7 +115,7 @@ function AccountDataPage() {
 
       // Detect device type
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      console.log(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}`);
+      console.log(`📱 Device: ${isMobile ? "Mobile" : "Desktop"}`);
 
       // Different constraints for mobile vs desktop
       let constraints;
@@ -122,9 +127,9 @@ function AccountDataPage() {
             facingMode: { exact: "environment" }, // Force back camera on mobile
             width: { ideal: 1280, max: 1920 },
             height: { ideal: 720, max: 1080 },
-            frameRate: { ideal: 24, max: 30 }
+            frameRate: { ideal: 24, max: 30 },
           },
-          audio: false
+          audio: false,
         };
       } else {
         // DESKTOP CONSTRAINTS
@@ -132,9 +137,9 @@ function AccountDataPage() {
           video: {
             width: { ideal: 1920 },
             height: { ideal: 1080 },
-            frameRate: { ideal: 30 }
+            frameRate: { ideal: 30 },
           },
-          audio: false
+          audio: false,
         };
       }
 
@@ -155,7 +160,8 @@ function AccountDataPage() {
 
         // Wait for video to load
         await new Promise((resolve) => {
-          if (video.readyState >= 3) { // HAVE_FUTURE_DATA
+          if (video.readyState >= 3) {
+            // HAVE_FUTURE_DATA
             resolve();
             return;
           }
@@ -179,14 +185,16 @@ function AccountDataPage() {
           await video.play();
           console.log("▶️ Video playing successfully");
         } catch (playError) {
-          console.warn("⚠️ Autoplay prevented, trying with user gesture...", playError);
+          console.warn(
+            "⚠️ Autoplay prevented, trying with user gesture...",
+            playError,
+          );
           // Mobile browsers often block autoplay, but we can still show the stream
         }
       }
 
       console.log("🚀 Camera started successfully");
       setIsCameraLoading(false);
-
     } catch (error) {
       console.error("❌ Camera error details:", error);
       setIsCameraLoading(false);
@@ -195,25 +203,27 @@ function AccountDataPage() {
       let errorMessage = "Unable to access camera";
 
       switch (error.name) {
-        case 'NotAllowedError':
-        case 'PermissionDeniedError':
-          errorMessage = "Camera permission denied. Please allow camera access in your browser settings.";
+        case "NotAllowedError":
+        case "PermissionDeniedError":
+          errorMessage =
+            "Camera permission denied. Please allow camera access in your browser settings.";
           break;
-        case 'NotFoundError':
-        case 'DevicesNotFoundError':
+        case "NotFoundError":
+        case "DevicesNotFoundError":
           errorMessage = "No camera found on this device.";
           break;
-        case 'NotReadableError':
-        case 'TrackStartError':
+        case "NotReadableError":
+        case "TrackStartError":
           errorMessage = "Camera is already in use by another application.";
           break;
-        case 'OverconstrainedError':
-          errorMessage = "Camera constraints could not be satisfied. Trying alternative settings...";
+        case "OverconstrainedError":
+          errorMessage =
+            "Camera constraints could not be satisfied. Trying alternative settings...";
           // Try with simpler constraints
           try {
             const fallbackStream = await navigator.mediaDevices.getUserMedia({
               video: true,
-              audio: false
+              audio: false,
             });
             if (videoRef.current) {
               videoRef.current.srcObject = fallbackStream;
@@ -263,14 +273,16 @@ function AccountDataPage() {
     }
 
     try {
-      console.log(`Capturing from video: ${video.videoWidth}x${video.videoHeight}`);
+      console.log(
+        `Capturing from video: ${video.videoWidth}x${video.videoHeight}`,
+      );
 
       // Create canvas with video dimensions
-      const canvas = document.createElement('canvas');
+      const canvas = document.createElement("canvas");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
-      const context = canvas.getContext('2d');
+      const context = canvas.getContext("2d");
       if (!context) {
         throw new Error("Could not create canvas context");
       }
@@ -284,20 +296,22 @@ function AccountDataPage() {
         canvas.toBlob(
           (blob) => {
             if (blob) {
-              console.log(`📦 Blob created: ${(blob.size / 1024).toFixed(1)} KB`);
+              console.log(
+                `📦 Blob created: ${(blob.size / 1024).toFixed(1)} KB`,
+              );
               resolve(blob);
             } else {
               reject(new Error("Canvas to blob conversion failed"));
             }
           },
-          'image/jpeg',
-          0.92 // Good quality for both mobile and desktop
+          "image/jpeg",
+          0.92, // Good quality for both mobile and desktop
         );
       });
 
       // Create file object
       const fileName = `task_${currentCaptureId}_${Date.now()}.jpg`;
-      const file = new File([blob], fileName, { type: 'image/jpeg' });
+      const file = new File([blob], fileName, { type: "image/jpeg" });
 
       console.log(`✅ Photo captured: ${fileName}`);
 
@@ -312,7 +326,6 @@ function AccountDataPage() {
 
       // Auto-hide success message after 3 seconds
       setTimeout(() => setSuccessMessage(""), 3000);
-
     } catch (error) {
       console.error("❌ Photo capture error:", error);
       alert(`Failed to capture photo: ${error.message}`);
@@ -324,7 +337,7 @@ function AccountDataPage() {
     console.log("🛑 Stopping camera...");
 
     if (cameraStream) {
-      cameraStream.getTracks().forEach(track => {
+      cameraStream.getTracks().forEach((track) => {
         track.stop();
         console.log(`Stopped track: ${track.kind}`);
       });
@@ -557,8 +570,8 @@ function AccountDataPage() {
 
         setHistoryData((prev) =>
           prev.map((item) =>
-            item._id === rowId ? { ...item, col15: updatedStatus } : item
-          )
+            item._id === rowId ? { ...item, col15: updatedStatus } : item,
+          ),
         );
 
         // Exit edit mode
@@ -695,14 +708,14 @@ function AccountDataPage() {
           prev.filter(
             (item) =>
               !selectedHistoryItems.some(
-                (selected) => selected._id === item._id
-              )
-          )
+                (selected) => selected._id === item._id,
+              ),
+          ),
         );
 
         setSelectedHistoryItems([]);
         setSuccessMessage(
-          `Successfully marked ${selectedHistoryItems.length} items as Admin Done!`
+          `Successfully marked ${selectedHistoryItems.length} items as Admin Done!`,
         );
 
         // Refresh data
@@ -726,7 +739,7 @@ function AccountDataPage() {
     const selectedItemsArray = Array.from(selectedItems);
     // console.log("sleectedItemsArray", selectedItemsArray);
     return selectedItemsArray.every(
-      (id) => additionalData[id] === "Yes" || additionalData[id] === "Not Done"
+      (id) => additionalData[id] === "Yes" || additionalData[id] === "Not Done",
     );
   }, [selectedItems, additionalData]);
 
@@ -734,12 +747,12 @@ function AccountDataPage() {
   const filteredAccountData = useMemo(() => {
     let filtered = searchTerm
       ? accountData.filter((account) =>
-        Object.values(account).some(
-          (value) =>
-            value &&
-            value.toString().toLowerCase().includes(searchTerm.toLowerCase())
+          Object.values(account).some(
+            (value) =>
+              value &&
+              value.toString().toLowerCase().includes(searchTerm.toLowerCase()),
+          ),
         )
-      )
       : accountData;
 
     // Apply Status Filter
@@ -776,13 +789,13 @@ function AccountDataPage() {
       .filter((item) => {
         const matchesSearch = searchTerm
           ? Object.values(item).some(
-            (value) =>
-              value &&
-              value
-                .toString()
-                .toLowerCase()
-                .includes(searchTerm.toLowerCase())
-          )
+              (value) =>
+                value &&
+                value
+                  .toString()
+                  .toLowerCase()
+                  .includes(searchTerm.toLowerCase()),
+            )
           : true;
         const matchesMember =
           selectedMembers.length > 0
@@ -821,14 +834,14 @@ function AccountDataPage() {
     const memberStats =
       selectedMembers.length > 0
         ? selectedMembers.reduce((stats, member) => {
-          const memberTasks = historyData.filter(
-            (task) => task["col4"] === member
-          ).length;
-          return {
-            ...stats,
-            [member]: memberTasks,
-          };
-        }, {})
+            const memberTasks = historyData.filter(
+              (task) => task["col4"] === member,
+            ).length;
+            return {
+              ...stats,
+              [member]: memberTasks,
+            };
+          }, {})
         : {};
     const filteredTotal = filteredHistoryData.length;
     return {
@@ -853,7 +866,7 @@ function AccountDataPage() {
       return membersList;
     } else {
       return membersList.filter(
-        (member) => member.toLowerCase() === username.toLowerCase()
+        (member) => member.toLowerCase() === username.toLowerCase(),
       );
     }
   };
@@ -865,7 +878,7 @@ function AccountDataPage() {
       const pendingAccounts = [];
       const historyRows = [];
       const response = await fetch(
-        `${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.SHEET_NAME}&action=fetch&t=${Date.now()}`
+        `${CONFIG.APPS_SCRIPT_URL}?sheet=${CONFIG.SHEET_NAME}&action=fetch&t=${Date.now()}`,
       );
       if (!response.ok) {
         throw new Error(`Failed to fetch data: ${response.status}`);
@@ -905,7 +918,7 @@ function AccountDataPage() {
         let rowValues = [];
         if (row.c) {
           rowValues = row.c.map((cell) =>
-            cell && cell.v !== undefined ? cell.v : ""
+            cell && cell.v !== undefined ? cell.v : "",
           );
         } else if (Array.isArray(row)) {
           rowValues = row;
@@ -937,8 +950,8 @@ function AccountDataPage() {
         const stableId = taskId
           ? `task_${taskId}_${googleSheetsRowIndex}`
           : `row_${googleSheetsRowIndex}_${Math.random()
-            .toString(36)
-            .substring(2, 15)}`;
+              .toString(36)
+              .substring(2, 15)}`;
 
         const rowData = {
           _id: stableId,
@@ -1057,7 +1070,7 @@ function AccountDataPage() {
       // console.log(`Checkbox clicked: ${id}, checked: ${isChecked}`)
       handleSelectItem(id, isChecked);
     },
-    [handleSelectItem]
+    [handleSelectItem],
   );
 
   const handleSelectAllItems = useCallback(
@@ -1077,7 +1090,7 @@ function AccountDataPage() {
         // console.log("Cleared all selections")
       }
     },
-    [filteredAccountData]
+    [filteredAccountData],
   );
 
   // ✅ SEPARATE: File upload handler
@@ -1088,7 +1101,7 @@ function AccountDataPage() {
     console.log(`📁 File upload for: ${id}`, file.name);
 
     setAccountData((prev) =>
-      prev.map((item) => (item._id === id ? { ...item, image: file } : item))
+      prev.map((item) => (item._id === id ? { ...item, image: file } : item)),
     );
   }, []);
 
@@ -1119,6 +1132,101 @@ function AccountDataPage() {
     });
   };
 
+  // Delete row handler
+  const handleDeleteRow = useCallback(async (account) => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this task? This action will remove the row permanently from the sheet.",
+      )
+    )
+      return;
+
+    if (!account || !account._rowIndex) {
+      alert("Cannot delete: missing row index for this record.");
+      return;
+    }
+
+    setDeletingRows((prev) => new Set([...prev, account._id]));
+    try {
+      // Try multiple action names and methods (POST, then GET fallback)
+      const actions = [
+        "deleteRow",
+        "removeRow",
+        "delete",
+        "deleteByRowIndex",
+        "deleteByTaskId",
+        "removeByTaskId",
+      ];
+
+      const parseResponse = async (response) => {
+        const text = await response.text();
+        console.debug("Delete response text:", text);
+        try {
+          return JSON.parse(text);
+        } catch (e) {
+          return { success: response.ok, text };
+        }
+      };
+
+      let res = null;
+
+      for (const action of actions) {
+        const formData = new FormData();
+        // include both keys for compatibility with different server implementations
+        formData.append("sheetName", CONFIG.SHEET_NAME);
+        formData.append("sheet", CONFIG.SHEET_NAME);
+        formData.append("action", action);
+        formData.append("rowIndex", String(account._rowIndex));
+        formData.append("rowNumber", String(account._rowIndex));
+        formData.append("index", String(account._rowIndex));
+        formData.append("taskId", account._taskId || account["col1"] || "");
+        formData.append("rowData", JSON.stringify(account));
+
+        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+          method: "POST",
+          body: formData,
+        });
+
+        res = await parseResponse(response);
+        if (res && res.success) {
+          console.debug("Delete POST succeeded with action:", action);
+          break;
+        }
+      }
+
+      if (!res || !res.success) {
+        for (const action of actions) {
+          const url = `${CONFIG.APPS_SCRIPT_URL}?action=${encodeURIComponent(action)}&sheet=${encodeURIComponent(CONFIG.SHEET_NAME)}&rowIndex=${encodeURIComponent(account._rowIndex)}&taskId=${encodeURIComponent(account._taskId || account["col1"] || "")}&t=${Date.now()}`;
+          const getResp = await fetch(url);
+          res = await parseResponse(getResp);
+          if (res && res.success) {
+            console.debug("Delete GET succeeded with action:", action);
+            break;
+          }
+        }
+      }
+
+      if (!res || !res.success) {
+        const errMsg =
+          (res && (res.error || res.message || res.text)) ||
+          "Server failed to delete row";
+        throw new Error(errMsg);
+      }
+
+      setAccountData((prev) => prev.filter((item) => item._id !== account._id));
+      setSuccessMessage("Row deleted successfully.");
+    } catch (err) {
+      console.error("Delete failed:", err);
+      alert("Delete failed: " + (err.message || "Server error"));
+    } finally {
+      setDeletingRows((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(account._id);
+        return newSet;
+      });
+    }
+  }, []);
+
   const toggleHistory = () => {
     setShowHistory((prev) => !prev);
     resetFilters();
@@ -1142,7 +1250,7 @@ function AccountDataPage() {
 
     if (missingRemarks.length > 0) {
       alert(
-        `Please provide remarks for items marked as "No". ${missingRemarks.length} item(s) are missing remarks.`
+        `Please provide remarks for items marked as "No". ${missingRemarks.length} item(s) are missing remarks.`,
       );
       return;
     }
@@ -1156,7 +1264,7 @@ function AccountDataPage() {
 
     if (missingRequiredImages.length > 0) {
       alert(
-        `Please upload images for all required attachments. ${missingRequiredImages.length} item(s) are missing required images.`
+        `Please upload images for all required attachments. ${missingRequiredImages.length} item(s) are missing required images.`,
       );
       return;
     }
@@ -1184,7 +1292,7 @@ function AccountDataPage() {
                 "fileName",
                 `task_${item["col1"]}_${Date.now()}.${item.image.name
                   .split(".")
-                  .pop()}`
+                  .pop()}`,
               );
               formData.append("mimeType", item.image.type);
               formData.append("folderId", CONFIG.DRIVE_FOLDER_ID);
@@ -1251,13 +1359,16 @@ function AccountDataPage() {
           col14:
             imageUrlMap[id] ||
             (item.image && typeof item.image === "string" ? item.image : ""), // Column O
-          col16: subCategoryUpdates[id] !== undefined ? subCategoryUpdates[id] : (item["col16"] || ""), // Column Q
+          col16:
+            subCategoryUpdates[id] !== undefined
+              ? subCategoryUpdates[id]
+              : item["col16"] || "", // Column Q
         };
       });
 
       // Update local state
       setAccountData((prev) =>
-        prev.filter((item) => !selectedItems.has(item._id))
+        prev.filter((item) => !selectedItems.has(item._id)),
       );
       setHistoryData((prev) => [...submittedItemsForHistory, ...prev]);
       setSelectedItems(new Set());
@@ -1281,7 +1392,7 @@ function AccountDataPage() {
       const result = await response.json();
       if (result.success) {
         setSuccessMessage(
-          `Successfully submitted ${selectedItemsArray.length} task(s)!`
+          `Successfully submitted ${selectedItemsArray.length} task(s)!`,
         );
       } else {
         console.error("Background submission failed:", result.error);
@@ -1353,7 +1464,6 @@ function AccountDataPage() {
 
             {/* NEW: Status Filter Dropdown */}
             <div className="relative w-full sm:w-48">
-
               <select
                 id="status-filter"
                 value={statusFilter}
@@ -1390,10 +1500,11 @@ function AccountDataPage() {
               <button
                 onClick={handleSubmit}
                 disabled={!isSubmitEnabled || isSubmitting}
-                className={`rounded-md py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200 w-full sm:w-auto ${isSubmitEnabled && !isSubmitting
-                  ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 cursor-pointer"
-                  : "bg-gray-400 cursor-not-allowed opacity-50"
-                  }`}
+                className={`rounded-md py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200 w-full sm:w-auto ${
+                  isSubmitEnabled && !isSubmitting
+                    ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 cursor-pointer"
+                    : "bg-gray-400 cursor-not-allowed opacity-50"
+                }`}
               >
                 {isSubmitting
                   ? "Processing..."
@@ -1445,8 +1556,9 @@ function AccountDataPage() {
               </h2>
               <p className="text-purple-600 text-sm">
                 {showHistory
-                  ? `${CONFIG.PAGE_CONFIG.historyDescription} for ${userRole === "admin" ? "all" : "your"
-                  } tasks`
+                  ? `${CONFIG.PAGE_CONFIG.historyDescription} for ${
+                      userRole === "admin" ? "all" : "your"
+                    } tasks`
                   : CONFIG.PAGE_CONFIG.description}
               </p>
             </div>
@@ -1547,13 +1659,13 @@ function AccountDataPage() {
                     startDate ||
                     endDate ||
                     searchTerm) && (
-                      <button
-                        onClick={resetFilters}
-                        className="px-3 py-1 bg-red-100 text-red-700 rounded-md hover:bg-red-200 text-sm"
-                      >
-                        Clear All Filters
-                      </button>
-                    )}
+                    <button
+                      onClick={resetFilters}
+                      className="px-3 py-1 bg-red-100 text-red-700 rounded-md hover:bg-red-200 text-sm"
+                    >
+                      Clear All Filters
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1586,15 +1698,15 @@ function AccountDataPage() {
                       startDate ||
                       endDate ||
                       searchTerm) && (
-                        <div className="px-3 py-2 bg-white rounded-md shadow-sm">
-                          <span className="text-xs text-gray-500">
-                            Filtered Results
-                          </span>
-                          <div className="text-lg font-semibold text-blue-600">
-                            {getTaskStatistics().filteredTotal}
-                          </div>
+                      <div className="px-3 py-2 bg-white rounded-md shadow-sm">
+                        <span className="text-xs text-gray-500">
+                          Filtered Results
+                        </span>
+                        <div className="text-lg font-semibold text-blue-600">
+                          {getTaskStatistics().filteredTotal}
                         </div>
-                      )}
+                      </div>
+                    )}
                     {selectedMembers.map((member) => (
                       <div
                         key={member}
@@ -1636,17 +1748,17 @@ function AccountDataPage() {
                                     (item["col15"].toString().trim() !==
                                       "Done" &&
                                       item["col15"].toString().trim() !==
-                                      "Not Done")
+                                        "Not Done"),
                                 ).length > 0 &&
                                 selectedHistoryItems.length ===
-                                filteredHistoryData.filter(
-                                  (item) =>
-                                    isEmpty(item["col15"]) ||
-                                    (item["col15"].toString().trim() !==
-                                      "Done" &&
-                                      item["col15"].toString().trim() !==
-                                      "Not Done")
-                                ).length
+                                  filteredHistoryData.filter(
+                                    (item) =>
+                                      isEmpty(item["col15"]) ||
+                                      (item["col15"].toString().trim() !==
+                                        "Done" &&
+                                        item["col15"].toString().trim() !==
+                                          "Not Done"),
+                                  ).length
                               }
                               onChange={(e) => {
                                 const unprocessedItems =
@@ -1656,7 +1768,7 @@ function AccountDataPage() {
                                       (item["col15"].toString().trim() !==
                                         "Done" &&
                                         item["col15"].toString().trim() !==
-                                        "Not Done")
+                                          "Not Done"),
                                   );
                                 if (e.target.checked) {
                                   setSelectedHistoryItems(unprocessedItems);
@@ -1799,7 +1911,7 @@ function AccountDataPage() {
                                   <div className="flex items-center justify-between">
                                     <div>
                                       {!isEmpty(history["col15"]) &&
-                                        history["col15"].toString().trim() ===
+                                      history["col15"].toString().trim() ===
                                         "Done" ? (
                                         <div className="flex items-center">
                                           <div className="h-4 w-4 rounded border-gray-300 text-green-600 bg-green-100 mr-2 flex items-center justify-center">
@@ -1815,7 +1927,7 @@ function AccountDataPage() {
                                         </div>
                                       ) : !isEmpty(history["col15"]) &&
                                         history["col15"].toString().trim() ===
-                                        "Not Done" ? (
+                                          "Not Done" ? (
                                         <div className="flex items-center text-red-500 text-sm">
                                           <div className="h-4 w-4 rounded border-gray-300 bg-red-100 mr-2 flex items-center justify-center">
                                             <span className="text-xs text-red-600">
@@ -1849,38 +1961,41 @@ function AccountDataPage() {
                             {userRole === "admin" && (
                               <td className="px-3 py-4 w-12">
                                 {!isEmpty(history["col15"]) &&
-                                  (history["col15"].toString().trim() ===
-                                    "Done" ||
-                                    history["col15"].toString().trim() ===
+                                (history["col15"].toString().trim() ===
+                                  "Done" ||
+                                  history["col15"].toString().trim() ===
                                     "Not Done") ? (
                                   // Already processed - show status only
                                   <div className="flex flex-col items-center">
                                     <div
-                                      className={`h-4 w-4 rounded border-gray-300 ${history["col15"].toString().trim() ===
+                                      className={`h-4 w-4 rounded border-gray-300 ${
+                                        history["col15"].toString().trim() ===
                                         "Done"
-                                        ? "text-green-600 bg-green-100"
-                                        : "text-red-600 bg-red-100"
-                                        }`}
+                                          ? "text-green-600 bg-green-100"
+                                          : "text-red-600 bg-red-100"
+                                      }`}
                                     >
                                       <span
-                                        className={`text-xs ${history["col15"].toString().trim() ===
+                                        className={`text-xs ${
+                                          history["col15"].toString().trim() ===
                                           "Done"
-                                          ? "text-green-600"
-                                          : "text-red-600"
-                                          }`}
+                                            ? "text-green-600"
+                                            : "text-red-600"
+                                        }`}
                                       >
                                         {history["col15"].toString().trim() ===
-                                          "Done"
+                                        "Done"
                                           ? "✓"
                                           : "✗"}
                                       </span>
                                     </div>
                                     <span
-                                      className={`text-xs mt-1 text-center break-words ${history["col15"].toString().trim() ===
+                                      className={`text-xs mt-1 text-center break-words ${
+                                        history["col15"].toString().trim() ===
                                         "Done"
-                                        ? "text-green-600"
-                                        : "text-red-600"
-                                        }`}
+                                          ? "text-green-600"
+                                          : "text-red-600"
+                                      }`}
                                     >
                                       {history["col15"].toString().trim()}
                                     </span>
@@ -1892,18 +2007,18 @@ function AccountDataPage() {
                                       type="checkbox"
                                       className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                                       checked={selectedHistoryItems.some(
-                                        (item) => item._id === history._id
+                                        (item) => item._id === history._id,
                                       )}
                                       onChange={() => {
                                         setSelectedHistoryItems((prev) =>
                                           prev.some(
-                                            (item) => item._id === history._id
+                                            (item) => item._id === history._id,
                                           )
                                             ? prev.filter(
-                                              (item) =>
-                                                item._id !== history._id
-                                            )
-                                            : [...prev, history]
+                                                (item) =>
+                                                  item._id !== history._id,
+                                              )
+                                            : [...prev, history],
                                         );
                                       }}
                                     />
@@ -2027,12 +2142,13 @@ function AccountDataPage() {
                             </td>
                             <td className="px-3 py-4 bg-blue-50 min-w-[80px]">
                               <span
-                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full break-words ${history["col12"] === "Yes"
-                                  ? "bg-green-100 text-green-800"
-                                  : history["col12"] === "No"
-                                    ? "bg-red-100 text-red-800"
-                                    : "bg-gray-100 text-gray-800"
-                                  }`}
+                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full break-words ${
+                                  history["col12"] === "Yes"
+                                    ? "bg-green-100 text-green-800"
+                                    : history["col12"] === "No"
+                                      ? "bg-red-100 text-red-800"
+                                      : "bg-gray-100 text-gray-800"
+                                }`}
                               >
                                 {history["col12"] || "—"}
                               </span>
@@ -2090,9 +2206,9 @@ function AccountDataPage() {
                           className="px-6 py-4 text-center text-gray-500"
                         >
                           {searchTerm ||
-                            selectedMembers.length > 0 ||
-                            startDate ||
-                            endDate
+                          selectedMembers.length > 0 ||
+                          startDate ||
+                          endDate
                             ? "No historical records matching your filters"
                             : "No completed records found"}
                         </td>
@@ -2170,6 +2286,9 @@ function AccountDataPage() {
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
                         Upload Image
                       </th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
+                        Delete
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -2179,8 +2298,9 @@ function AccountDataPage() {
                         return (
                           <tr
                             key={account._id}
-                            className={`${isSelected ? "bg-purple-50" : ""
-                              } hover:bg-gray-50`}
+                            className={`${
+                              isSelected ? "bg-purple-50" : ""
+                            } hover:bg-gray-50`}
                           >
                             <td className="px-3 py-4 w-12 relative">
                               {/* Status Label - Fixed positioning */}
@@ -2190,7 +2310,8 @@ function AccountDataPage() {
                                   if (!dateStr) return null;
 
                                   const datePart = dateStr.split(" ")[0];
-                                  const parsedDate = parseDateFromDDMMYYYY(datePart);
+                                  const parsedDate =
+                                    parseDateFromDDMMYYYY(datePart);
                                   if (!parsedDate) return null;
 
                                   const today = new Date();
@@ -2199,8 +2320,11 @@ function AccountDataPage() {
                                   const taskDate = new Date(parsedDate);
                                   taskDate.setHours(0, 0, 0, 0);
 
-                                  const timeDiff = taskDate.getTime() - today.getTime();
-                                  const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+                                  const timeDiff =
+                                    taskDate.getTime() - today.getTime();
+                                  const dayDiff = Math.ceil(
+                                    timeDiff / (1000 * 3600 * 24),
+                                  );
 
                                   if (dayDiff === 0) {
                                     return (
@@ -2229,7 +2353,9 @@ function AccountDataPage() {
                                 type="checkbox"
                                 className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                                 checked={isSelected}
-                                onChange={(e) => handleCheckboxClick(e, account._id)}
+                                onChange={(e) =>
+                                  handleCheckboxClick(e, account._id)
+                                }
                               />
                             </td>
                             <td className="px-3 py-4 min-w-[100px]">
@@ -2354,25 +2480,37 @@ function AccountDataPage() {
                               />
                             </td>
                             {/* Upload Image Column - DESKTOP */}
-                            <td className={`px-6 py-4 min-w-[150px] ${!account["col17"] ? "bg-orange-50" : ""}`}>
+                            <td
+                              className={`px-6 py-4 min-w-[150px] ${!account["col17"] ? "bg-orange-50" : ""}`}
+                            >
                               {account.image ? (
                                 // ✅ SHOW UPLOADED IMAGE
                                 <div className="flex items-center">
                                   <img
-                                    src={typeof account.image === "string" ? account.image : URL.createObjectURL(account.image)}
+                                    src={
+                                      typeof account.image === "string"
+                                        ? account.image
+                                        : URL.createObjectURL(account.image)
+                                    }
                                     alt="Receipt"
                                     className="h-10 w-10 object-cover rounded-md mr-2 flex-shrink-0"
                                   />
                                   <div className="flex flex-col min-w-0">
                                     <span className="text-xs text-gray-500 break-words">
-                                      {account.image instanceof File ? account.image.name : "Uploaded"}
+                                      {account.image instanceof File
+                                        ? account.image.name
+                                        : "Uploaded"}
                                     </span>
                                     {account.image instanceof File ? (
-                                      <span className="text-xs text-green-600">Ready to upload</span>
+                                      <span className="text-xs text-green-600">
+                                        Ready to upload
+                                      </span>
                                     ) : (
                                       <button
                                         className="text-xs text-purple-600 hover:text-purple-800 break-words"
-                                        onClick={() => window.open(account.image, "_blank")}
+                                        onClick={() =>
+                                          window.open(account.image, "_blank")
+                                        }
                                       >
                                         View Image
                                       </button>
@@ -2382,7 +2520,6 @@ function AccountDataPage() {
                               ) : (
                                 // ✅ SHOW UPLOAD OPTIONS
                                 <div className="flex flex-col gap-2">
-
                                   {/* ✅ CAMERA BUTTON - Opens Modal */}
                                   {/* <button
         onClick={() => {
@@ -2405,16 +2542,20 @@ function AccountDataPage() {
                                   {/* ✅ FILE UPLOAD BUTTON - Opens File Picker */}
                                   <label
                                     htmlFor={`upload-${account._id}`}
-                                    className={`flex items-center justify-start px-2 py-1 rounded text-xs font-medium transition-colors ${isSelected
-                                      ? account["col9"]?.toUpperCase() === "YES"
-                                        ? "text-red-600 hover:text-red-800 hover:bg-red-50 cursor-pointer"
-                                        : "text-purple-600 hover:text-purple-800 hover:bg-purple-50 cursor-pointer"
-                                      : "text-gray-400 cursor-not-allowed"
-                                      }`}
+                                    className={`flex items-center justify-start px-2 py-1 rounded text-xs font-medium transition-colors ${
+                                      isSelected
+                                        ? account["col9"]?.toUpperCase() ===
+                                          "YES"
+                                          ? "text-red-600 hover:text-red-800 hover:bg-red-50 cursor-pointer"
+                                          : "text-purple-600 hover:text-purple-800 hover:bg-purple-50 cursor-pointer"
+                                        : "text-gray-400 cursor-not-allowed"
+                                    }`}
                                   >
                                     <Upload className="h-4 w-4 mr-1 flex-shrink-0" />
                                     <span className="break-words">
-                                      {account["col9"]?.toUpperCase() === "YES" ? "Upload (Required*)" : "Upload from File"}
+                                      {account["col9"]?.toUpperCase() === "YES"
+                                        ? "Upload (Required*)"
+                                        : "Upload from File"}
                                     </span>
                                   </label>
 
@@ -2424,13 +2565,32 @@ function AccountDataPage() {
                                     accept="image/*"
                                     className="hidden"
                                     onChange={(e) => {
-                                      console.log("📁 File selected for:", account._id);
+                                      console.log(
+                                        "📁 File selected for:",
+                                        account._id,
+                                      );
                                       handleImageUpload(account._id, e);
                                     }}
                                     disabled={!isSelected}
                                   />
                                 </div>
                               )}
+                            </td>
+                            <td className="px-3 py-4 whitespace-nowrap">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (!confirm("Delete row permanently?"))
+                                    return;
+                                  handleDeleteRow(account);
+                                }}
+                                disabled={deletingRows.has(account._id)}
+                                className="text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50"
+                              >
+                                {deletingRows.has(account._id)
+                                  ? "Deleting..."
+                                  : "Delete"}
+                              </button>
                             </td>
                           </tr>
                         );
@@ -2459,8 +2619,9 @@ function AccountDataPage() {
                     return (
                       <div
                         key={account._id}
-                        className={`bg-white border border-gray-200 rounded-lg p-4 shadow-sm ${isSelected ? "bg-purple-50 border-purple-200" : ""
-                          }`}
+                        className={`bg-white border border-gray-200 rounded-lg p-4 shadow-sm ${
+                          isSelected ? "bg-purple-50 border-purple-200" : ""
+                        }`}
                       >
                         <div className="space-y-3">
                           {/* Checkbox */}
@@ -2656,7 +2817,9 @@ function AccountDataPage() {
 
                           {/* ✅ MOBILE: Upload Image Section */}
                           <div className="border-b pb-3">
-                            <span className="font-medium text-gray-700 block mb-2">Upload Image:</span>
+                            <span className="font-medium text-gray-700 block mb-2">
+                              Upload Image:
+                            </span>
 
                             {account.image ? (
                               // ✅ SHOW UPLOADED IMAGE
@@ -2672,14 +2835,20 @@ function AccountDataPage() {
                                 />
                                 <div className="flex flex-col">
                                   <span className="text-sm text-gray-700 font-medium">
-                                    {account.image instanceof File ? account.image.name : "Uploaded Image"}
+                                    {account.image instanceof File
+                                      ? account.image.name
+                                      : "Uploaded Image"}
                                   </span>
                                   {account.image instanceof File ? (
-                                    <span className="text-xs text-green-600">✓ Ready to upload</span>
+                                    <span className="text-xs text-green-600">
+                                      ✓ Ready to upload
+                                    </span>
                                   ) : (
                                     <button
                                       className="text-xs text-purple-600 hover:text-purple-800 text-left"
-                                      onClick={() => window.open(account.image, "_blank")}
+                                      onClick={() =>
+                                        window.open(account.image, "_blank")
+                                      }
                                     >
                                       View Full Image →
                                     </button>
@@ -2688,60 +2857,83 @@ function AccountDataPage() {
                               </div>
                             ) : (
                               // ✅ SHOW UPLOAD OPTIONS
-                              <div className="flex flex-col gap-3 mt-2">
+                              <>
+                                <div className="flex flex-col gap-3 mt-2">
+                                  {/* ✅ CAMERA BUTTON */}
+                                  {/* <button
+          onClick={() => {
+            if (!isSelected) return;
+            console.log("📸 Opening camera for:", account._id);
+            setCurrentCaptureId(account._id);
+            startCamera();
+          }}
+          disabled={!isSelected || isCameraLoading}
+          className={`flex items-center justify-center px-4 py-3 rounded-lg border-2 text-sm font-semibold transition-all ${
+            isSelected 
+              ? "bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 hover:shadow-md active:scale-95" 
+              : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
+          } disabled:opacity-50`}
+        >
+          <Camera className="h-5 w-5 mr-2" />
+          <span>{isCameraLoading ? "Loading Camera..." : "📸 Take Photo"}</span>
+        </button> */}
 
-                                {/* ✅ CAMERA BUTTON */}
-                                {/* <button
-        onClick={() => {
-          if (!isSelected) return;
-          console.log("📸 Opening camera for:", account._id);
-          setCurrentCaptureId(account._id);
-          startCamera();
-        }}
-        disabled={!isSelected || isCameraLoading}
-        className={`flex items-center justify-center px-4 py-3 rounded-lg border-2 text-sm font-semibold transition-all ${
-          isSelected 
-            ? "bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 hover:shadow-md active:scale-95" 
-            : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
-        } disabled:opacity-50`}
-      >
-        <Camera className="h-5 w-5 mr-2" />
-        <span>{isCameraLoading ? "Loading Camera..." : "📸 Take Photo"}</span>
-      </button> */}
-
-                                {/* ✅ FILE UPLOAD BUTTON */}
-                                <label
-                                  className={`flex items-center justify-center px-4 py-3 rounded-lg border-2 text-sm font-semibold transition-all ${isSelected
-                                    ? account["col9"]?.toUpperCase() === "YES"
-                                      ? "bg-red-50 border-red-300 text-red-700 hover:bg-red-100 hover:shadow-md active:scale-95 cursor-pointer"
-                                      : "bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100 hover:shadow-md active:scale-95 cursor-pointer"
-                                    : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
+                                  {/* ✅ FILE UPLOAD BUTTON */}
+                                  <label
+                                    className={`flex items-center justify-center px-4 py-3 rounded-lg border-2 text-sm font-semibold transition-all ${
+                                      isSelected
+                                        ? account["col9"]?.toUpperCase() ===
+                                          "YES"
+                                          ? "bg-red-50 border-red-300 text-red-700 hover:bg-red-100 hover:shadow-md active:scale-95 cursor-pointer"
+                                          : "bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100 hover:shadow-md active:scale-95 cursor-pointer"
+                                        : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
                                     } ${!isSelected ? "pointer-events-none" : ""}`}
-                                >
-                                  <Upload className="h-5 w-5 mr-2" />
-                                  <span>
-                                    {account["col9"]?.toUpperCase() === "YES"
-                                      ? "📁 Upload (Required*)"
-                                      : "📁 Upload from Gallery"}
-                                  </span>
-                                  <input
-                                    type="file"
-                                    className="hidden"
-                                    accept="image/*"
-                                    onChange={(e) => {
-                                      console.log("📁 File selected for:", account._id);
-                                      handleImageUpload(account._id, e);
-                                    }}
-                                    disabled={!isSelected}
-                                  />
-                                </label>
+                                  >
+                                    <Upload className="h-5 w-5 mr-2" />
+                                    <span>
+                                      {account["col9"]?.toUpperCase() === "YES"
+                                        ? "📁 Upload (Required*)"
+                                        : "📁 Upload from Gallery"}
+                                    </span>
+                                    <input
+                                      type="file"
+                                      className="hidden"
+                                      accept="image/*"
+                                      onChange={(e) => {
+                                        console.log(
+                                          "📁 File selected for:",
+                                          account._id,
+                                        );
+                                        handleImageUpload(account._id, e);
+                                      }}
+                                      disabled={!isSelected}
+                                    />
+                                  </label>
 
-                                {account["col9"]?.toUpperCase() === "YES" && (
-                                  <p className="text-xs text-red-600 text-center">
-                                    ⚠️ Image upload is mandatory for this task
-                                  </p>
-                                )}
-                              </div>
+                                  {account["col9"]?.toUpperCase() === "YES" && (
+                                    <p className="text-xs text-red-600 text-center">
+                                      ⚠️ Image upload is mandatory for this task
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div className="mt-3">
+                                  <button
+                                    onClick={() => {
+                                      if (!isSelected) return;
+                                      if (!confirm("Delete permanently?"))
+                                        return;
+                                      handleDeleteRow(account);
+                                    }}
+                                    disabled={deletingRows.has(account._id)}
+                                    className="w-full py-2 rounded-lg border-2 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50"
+                                  >
+                                    {deletingRows.has(account._id)
+                                      ? "Deleting..."
+                                      : "Delete Task"}
+                                  </button>
+                                </div>
+                              </>
                             )}
                           </div>
                         </div>
@@ -2761,12 +2953,13 @@ function AccountDataPage() {
         </div>
         {isCameraOpen && (
           <div className="fixed inset-0 bg-black z-[9999] flex flex-col">
-
             {/* Header */}
             <div className="bg-black text-white px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between border-b border-gray-800">
               <div className="flex items-center gap-2 sm:gap-3">
                 <Camera className="w-5 h-5 sm:w-6 sm:h-6" />
-                <span className="font-medium text-base sm:text-lg">Take Photo</span>
+                <span className="font-medium text-base sm:text-lg">
+                  Take Photo
+                </span>
               </div>
               <button
                 onClick={stopCamera}
@@ -2786,8 +2979,8 @@ function AccountDataPage() {
                 playsInline
                 muted
                 style={{
-                  WebkitTransform: 'scaleX(-1)',
-                  transform: 'scaleX(-1)'
+                  WebkitTransform: "scaleX(-1)",
+                  transform: "scaleX(-1)",
                 }}
               />
 
@@ -2796,8 +2989,12 @@ function AccountDataPage() {
                 <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-90">
                   <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 sm:h-16 sm:w-16 border-4 border-white border-t-transparent mx-auto mb-4"></div>
-                    <p className="text-white font-medium text-base sm:text-lg">Initializing camera...</p>
-                    <p className="text-gray-300 text-sm sm:text-base mt-2">Please wait</p>
+                    <p className="text-white font-medium text-base sm:text-lg">
+                      Initializing camera...
+                    </p>
+                    <p className="text-gray-300 text-sm sm:text-base mt-2">
+                      Please wait
+                    </p>
                   </div>
                 </div>
               )}
@@ -2828,7 +3025,9 @@ function AccountDataPage() {
                     <div className="w-16 h-16 bg-red-900/80 rounded-full flex items-center justify-center mx-auto mb-4">
                       <X className="w-8 h-8 text-white" />
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-2">Camera Error</h3>
+                    <h3 className="text-xl font-bold text-white mb-2">
+                      Camera Error
+                    </h3>
                     <p className="text-gray-200 mb-4">{cameraError}</p>
                     <div className="flex gap-3 justify-center">
                       <button
@@ -2859,10 +3058,11 @@ function AccountDataPage() {
                   className={`
             relative w-20 h-20 sm:w-24 sm:h-24 rounded-full 
             flex items-center justify-center
-            ${isCameraLoading || cameraError
-                      ? 'bg-gray-600 cursor-not-allowed'
-                      : 'bg-white hover:bg-gray-100 active:scale-95'
-                    }
+            ${
+              isCameraLoading || cameraError
+                ? "bg-gray-600 cursor-not-allowed"
+                : "bg-white hover:bg-gray-100 active:scale-95"
+            }
             transition-all duration-200
             shadow-2xl
           `}
@@ -2872,11 +3072,13 @@ function AccountDataPage() {
                   <div className="absolute inset-0 border-4 border-white/30 rounded-full"></div>
 
                   {/* Inner circle */}
-                  <div className={`
+                  <div
+                    className={`
             w-16 h-16 sm:w-20 sm:h-20 rounded-full
-            ${isCameraLoading || cameraError ? 'bg-gray-500' : 'bg-white'}
+            ${isCameraLoading || cameraError ? "bg-gray-500" : "bg-white"}
             flex items-center justify-center
-          `}>
+          `}
+                  >
                     {isCameraLoading ? (
                       <div className="animate-spin rounded-full h-8 w-8 border-2 border-black border-t-transparent"></div>
                     ) : cameraError ? (
@@ -2895,21 +3097,24 @@ function AccountDataPage() {
                     ? "Initializing camera..."
                     : cameraError
                       ? "Fix camera error to continue"
-                      : "Center the subject and tap the button above"
-                  }
+                      : "Center the subject and tap the button above"}
                 </p>
                 <p className="text-white/60 text-xs sm:text-sm mt-2">
-                  {currentCaptureId ? `Task: ${currentCaptureId}` : "No task selected"}
+                  {currentCaptureId
+                    ? `Task: ${currentCaptureId}`
+                    : "No task selected"}
                 </p>
               </div>
 
               {/* Additional Controls for Desktop */}
               <div className="hidden sm:flex justify-between items-center mt-4 pt-4 border-t border-white/20">
                 <div className="text-white/70 text-sm">
-                  Press <kbd className="px-2 py-1 bg-gray-800 rounded">Esc</kbd> to close
+                  Press <kbd className="px-2 py-1 bg-gray-800 rounded">Esc</kbd>{" "}
+                  to close
                 </div>
                 <div className="text-white/70 text-sm">
-                  Use <kbd className="px-2 py-1 bg-gray-800 rounded">Space</kbd> to capture
+                  Use <kbd className="px-2 py-1 bg-gray-800 rounded">Space</kbd>{" "}
+                  to capture
                 </div>
               </div>
             </div>
@@ -2921,7 +3126,7 @@ function AccountDataPage() {
                 <button
                   ref={captureBtnRef}
                   onClick={capturePhoto}
-                  style={{ display: 'none' }}
+                  style={{ display: "none" }}
                 >
                   Capture
                 </button>
