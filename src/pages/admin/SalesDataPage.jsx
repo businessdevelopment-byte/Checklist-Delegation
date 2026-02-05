@@ -739,7 +739,7 @@ function AccountDataPage() {
     const selectedItemsArray = Array.from(selectedItems);
     // console.log("sleectedItemsArray", selectedItemsArray);
     return selectedItemsArray.every(
-      (id) => additionalData[id] === "Yes" || additionalData[id] === "Not Done",
+      (id) => additionalData[id] === "Yes" || additionalData[id] === "Not Done" && additionalData[id] === "Not Required",
     );
   }, [selectedItems, additionalData]);
 
@@ -2790,6 +2790,7 @@ function AccountDataPage() {
                               <option value="">Select...</option>
                               <option value="Yes">Yes</option>
                               <option value="Not Done">Not Done</option>
+                              <option value="Not Done">Not Required</option>
                             </select>
                           </div>
 
