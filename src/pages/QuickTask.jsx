@@ -387,6 +387,7 @@ export default function QuickTask() {
             'Sub Category': row.c[14]?.v || "", // Column O (Index 14)
             'Task Description': row.c[5]?.v || "",
             'End Date': startDateValue, // Use processed date
+             'Next Task Date': formatDate(row.c[11]?.v) || "", 
             Frequency: row.c[7]?.v || "",
             Reminders: row.c[8]?.v || "",
             Attachment: row.c[9]?.v || "",
