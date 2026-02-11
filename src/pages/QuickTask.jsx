@@ -222,6 +222,8 @@ export default function QuickTask() {
         } else {
           // Delegation sheet mapping
           rowDataObj.startDate = editedTask['Task End Date'] || "";
+          rowDataObj.nextTaskDate = formatDateForSheet(editedTask['Next Task Date']);
+
           rowDataObj.freq = editedTask.Freq || "";
           rowDataObj.enableReminders = editedTask['Enable Reminders'] || "";
           rowDataObj.requireAttachment = editedTask['Require Attachment'] || "";
@@ -457,6 +459,8 @@ export default function QuickTask() {
             Name: row.c[4]?.v || "",
             'Task Description': row.c[5]?.v || "",
             'Task End Date': formatDate(row.c[6]?.v),
+            'Next Task Date': formatDate(row.c[11]?.v) || "", // Column L
+
             Freq: row.c[7]?.v || "",
             'Enable Reminders': row.c[8]?.v || "",
             'Require Attachment': row.c[9]?.v || "",
@@ -853,6 +857,7 @@ export default function QuickTask() {
                         { key: 'Name', label: 'Name' },
                         { key: 'Task Description', label: 'Task Description', minWidth: 'min-w-[300px]' },
                         { key: 'End Date', label: 'End Date', bg: 'bg-yellow-50' },
+              { key: 'Next Task Date', label: 'Next Task Date', bg: 'bg-blue-50' }, // NEW
                         { key: 'Frequency', label: 'Frequency' },
                         { key: 'Reminders', label: 'Reminders' },
                         { key: 'Attachment', label: 'Attachment' },
@@ -1001,6 +1006,40 @@ export default function QuickTask() {
                                 formatDate(task['End Date']) || "—"
                               )}
                             </td>
+<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-blue-50">
+  {isEditing ? (
+    <input
+      type="datetime-local"
+      value={
+        editedTask['Next Task Date']
+          ? editedTask['Next Task Date']
+              .split(' ')[0]
+              .split('/')
+              .reverse()
+              .join('-') +
+            'T' +
+            (editedTask['Next Task Date'].split(' ')[1] || '00:00')
+          : ''
+      }
+      onChange={(e) => {
+        if (e.target.value) {
+          const [date, time] = e.target.value.split('T');
+          const [year, month, day] = date.split('-');
+          handleInputChange(
+            task._id,
+            'Next Task Date',
+            `${day}/${month}/${year} ${time}:00`
+          );
+        } else {
+          handleInputChange(task._id, 'Next Task Date', '');
+        }
+      }}
+      className="px-2 py-1 border border-gray-300 rounded text-sm"
+    />
+  ) : (
+    formatDate(task['Next Task Date']) || "—"
+  )}
+</td>
 
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {isEditing ? (
@@ -1232,6 +1271,13 @@ export default function QuickTask() {
                                 </div>
                               )}
                             </div>
+                            <div className="flex justify-between items-center border-b pb-2">
+  <span className="font-medium text-gray-700">Next Task Date:</span>
+  <div className="text-sm text-gray-900 break-words bg-blue-50 px-2 py-1 rounded text-right w-[35%]">
+    {formatDate(task['Next Task Date']) || "—"}
+  </div>
+</div>
+
                             <div className="flex justify-between items-center border-b pb-2">
                               <span className="font-medium text-gray-700">Frequency:</span>
                               {isEditing ? (
