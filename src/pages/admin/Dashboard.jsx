@@ -26,6 +26,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview")
   const [filterDepartment, setFilterDepartment] = useState("all");
   const [filterName, setFilterName] = useState("all");
+  const [filterMISName, setFilterMISName] = useState("all");
   const [userRole, setUserRole] = useState(sessionStorage.getItem("role") || "user");
   const [username, setUsername] = useState(sessionStorage.getItem("username") || "");
 
@@ -281,6 +282,15 @@ export default function AdminDashboard() {
     });
 
     setDateRange((prev) => ({ ...prev, filtered: true }));
+  };
+
+  const handleClearMISFilters = () => {
+    setFilterMISName("all");
+    setDateRange({
+      startDate: "",
+      endDate: "",
+      filtered: false,
+    });
   };
 
   // Format date as DD/MM/YYYY
@@ -925,6 +935,62 @@ export default function AdminDashboard() {
 
     return true;
   });
+
+  // Calculate stats for MIS report section
+  const misStats = (() => {
+    let tasks = departmentData.allTasks;
+
+    // Filter by name if admin and filterMISName is set
+    if (userRole === 'admin' && filterMISName !== 'all') {
+      tasks = tasks.filter(task => task.assignedTo === filterMISName);
+    }
+
+    // Filter by date if applicable (checklist mode)
+    if (dashboardType !== 'delegation' && dateRange.filtered && dateRange.startDate && dateRange.endDate) {
+      const start = new Date(dateRange.startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(dateRange.endDate);
+      end.setHours(23, 59, 59, 999);
+
+      tasks = tasks.filter(task => {
+        const taskDate = parseDateFromDDMMYYYY(task.taskStartDate);
+        return taskDate && taskDate >= start && taskDate <= end;
+      });
+    }
+
+    const total = tasks.length;
+    const completed = tasks.filter(t => t.status === 'completed').length;
+    // For pending/overdue breakdown
+    const pending = tasks.filter(t => t.status === 'pending').length;
+    const overdue = tasks.filter(t => t.status === 'overdue').length;
+
+    // For delegation mode ratings (if needed in MIS)
+    const ratingOne = tasks.filter(task => {
+      const completionCount = departmentData.taskCompletionFrequencyMap.get(task.id) || 0;
+      return completionCount === 1;
+    }).length;
+    const ratingTwo = tasks.filter(task => {
+      const completionCount = departmentData.taskCompletionFrequencyMap.get(task.id) || 0;
+      return completionCount === 2;
+    }).length;
+    const ratingThreePlus = tasks.filter(task => {
+      const completionCount = departmentData.taskCompletionFrequencyMap.get(task.id) || 0;
+      return completionCount >= 3;
+    }).length;
+
+    const rate = total > 0 ? ((completed / total) * 100).toFixed(1) : 0;
+
+    return {
+      total,
+      completed,
+      pending,
+      overdue,
+      rate,
+      ratingOne,
+      ratingTwo,
+      ratingThreePlus
+    };
+  })();
 
   // UPDATED: Get tasks by view with updated delegation logic
   const getTasksByView = (view) => {
@@ -1595,9 +1661,30 @@ export default function AdminDashboard() {
                   {/* UPDATED: Only show date range selection for checklist mode */}
                   {dashboardType !== "delegation" && (
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 bg-gray-50 p-4 rounded-lg border border-gray-100">
+                      {userRole === 'admin' && (
+                        <div className="space-y-2 lg:col-span-1">
+                          <label htmlFor="mis-staff-filter" className="flex items-center text-purple-700 text-sm font-medium">
+                            <Filter className="h-4 w-4 mr-2" />
+                            Filter by Name Wise
+                          </label>
+                          <select
+                            id="mis-staff-filter"
+                            value={filterMISName}
+                            onChange={(e) => setFilterMISName(e.target.value)}
+                            className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 bg-white"
+                          >
+                            <option value="all">All Users</option>
+                            {departmentData.staffMembers.map((staff) => (
+                              <option key={staff.id} value={staff.name}>
+                                {staff.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                       <div className="space-y-2 lg:col-span-1">
                         <label htmlFor="start-date" className="flex items-center text-purple-700 text-sm font-medium">
-                          End Date
+                          Start Date
                         </label>
                         <input
                           id="start-date"
@@ -1619,12 +1706,51 @@ export default function AdminDashboard() {
                           className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
                         />
                       </div>
-                      <div className="space-y-2 lg:col-span-2 flex items-end">
+                      <div className="space-y-2 lg:col-span-1 flex items-end gap-2">
                         <button
                           onClick={filterTasksByDateRange}
-                          className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded transition-colors"
+                          className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded transition-colors text-sm"
                         >
                           Apply Filter
+                        </button>
+                        <button
+                          onClick={handleClearMISFilters}
+                          className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded transition-colors text-sm border border-gray-200"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add Name Filter for admin in Delegation Mode too if needed, but the request says MIS Report section */}
+                  {dashboardType === "delegation" && userRole === 'admin' && (
+                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 max-w-sm">
+                      <div className="flex items-end gap-4">
+                        <div className="space-y-2 flex-1">
+                          <label htmlFor="mis-staff-filter-del" className="flex items-center text-purple-700 text-sm font-medium">
+                            <Filter className="h-4 w-4 mr-2" />
+                            Filter by Name Wise
+                          </label>
+                          <select
+                            id="mis-staff-filter-del"
+                            value={filterMISName}
+                            onChange={(e) => setFilterMISName(e.target.value)}
+                            className="w-full rounded-md border border-purple-200 p-2 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 bg-white"
+                          >
+                            <option value="all">All Users</option>
+                            {departmentData.staffMembers.map((staff) => (
+                              <option key={staff.id} value={staff.name}>
+                                {staff.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <button
+                          onClick={handleClearMISFilters}
+                          className="bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded transition-colors text-sm border border-gray-200 h-[38px]"
+                        >
+                          Clear Filter
                         </button>
                       </div>
                     </div>
@@ -1635,10 +1761,7 @@ export default function AdminDashboard() {
                     <div className="space-y-2">
                       <div className="text-sm font-medium text-purple-600">Total Tasks Assigned</div>
                       <div className="text-3xl font-bold text-purple-700">
-                        {dashboardType === "delegation"
-                          ? departmentData.totalTasks
-                          : (dateRange.filtered ? filteredDateStats.totalTasks : departmentData.totalTasks)
-                        }
+                        {misStats.total}
                       </div>
                       {dashboardType === "delegation" ? (
                         <p className="text-xs text-purple-600">All tasks from delegation sheet</p>
@@ -1653,10 +1776,7 @@ export default function AdminDashboard() {
                     <div className="space-y-2">
                       <div className="text-sm font-medium text-purple-600">Tasks Completed</div>
                       <div className="text-3xl font-bold text-purple-700">
-                        {dashboardType === "delegation"
-                          ? departmentData.completedTasks
-                          : (dateRange.filtered ? filteredDateStats.completedTasks : departmentData.completedTasks)
-                        }
+                        {misStats.completed}
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -1665,11 +1785,8 @@ export default function AdminDashboard() {
                       </div>
                       <div className="text-3xl font-bold text-purple-700">
                         {dashboardType === "delegation"
-                          ? departmentData.pendingTasks
-                          : (dateRange.filtered
-                            ? `${filteredDateStats.pendingTasks} / ${filteredDateStats.overdueTasks}`
-                            : `${departmentData.pendingTasks} / ${departmentData.overdueTasks}`
-                          )
+                          ? misStats.pending
+                          : `${misStats.pending} / ${misStats.overdue}`
                         }
                       </div>
                       <div className="text-xs text-purple-600">
@@ -1688,27 +1805,27 @@ export default function AdminDashboard() {
                       <div className="grid gap-4 md:grid-cols-3">
                         <div className="bg-white p-3 rounded-lg border border-amber-200">
                           <div className="text-sm font-medium text-amber-700">Pending Tasks</div>
-                          <div className="text-2xl font-bold text-amber-600">{filteredDateStats.pendingTasks}</div>
+                          <div className="text-2xl font-bold text-amber-600">{misStats.pending}</div>
                           <div className="text-xs text-amber-600 mt-1">All incomplete tasks (including overdue + today)</div>
                         </div>
                         <div className="bg-white p-3 rounded-lg border border-red-200">
                           <div className="text-sm font-medium text-red-700">Overdue Tasks</div>
-                          <div className="text-2xl font-bold text-red-600">{filteredDateStats.overdueTasks}</div>
+                          <div className="text-2xl font-bold text-red-600">{misStats.overdue}</div>
                           <div className="text-xs text-red-600 mt-1">Past due dates only (excluding today)</div>
                         </div>
                         <div className="bg-white p-3 rounded-lg border border-green-200">
                           <div className="text-sm font-medium text-green-700">Completed Once</div>
-                          <div className="text-2xl font-bold text-green-600">{departmentData.completedRatingOne}</div>
+                          <div className="text-2xl font-bold text-green-600">{misStats.ratingOne}</div>
                           <div className="text-xs text-green-600 mt-1">Tasks with rating 1</div>
                         </div>
                         <div className="bg-white p-3 rounded-lg border border-amber-200">
                           <div className="text-sm font-medium text-amber-700">Completed Twice</div>
-                          <div className="text-2xl font-bold text-amber-600">{departmentData.completedRatingTwo}</div>
+                          <div className="text-2xl font-bold text-amber-600">{misStats.ratingTwo}</div>
                           <div className="text-xs text-amber-600 mt-1">Tasks with rating 2</div>
                         </div>
                         <div className="bg-white p-3 rounded-lg border border-red-200">
                           <div className="text-sm font-medium text-red-700">Completed 3+ Times</div>
-                          <div className="text-2xl font-bold text-red-600">{departmentData.completedRatingThreePlus}</div>
+                          <div className="text-2xl font-bold text-red-600">{misStats.ratingThreePlus}</div>
                           <div className="text-xs text-red-600 mt-1">Tasks with rating 3 or higher</div>
                         </div>
                       </div>
@@ -1722,41 +1839,26 @@ export default function AdminDashboard() {
                         <h4 className="text-sm font-medium text-purple-700 mb-2">Completion Rate</h4>
                         <div className="flex items-center gap-4">
                           <div className="text-2xl font-bold text-purple-700">
-                            {dashboardType === "delegation"
-                              ? departmentData.completionRate
-                              : (dateRange.filtered ? filteredDateStats.completionRate : departmentData.completionRate)
-                            }%
+                            {misStats.rate}%
                           </div>
                           <div className="flex-1">
                             <div className="w-full h-6 bg-gray-200 rounded-full">
                               <div
                                 className="h-full rounded-full flex items-center justify-end px-3 text-xs font-medium text-white"
                                 style={{
-                                  width: `${dashboardType === "delegation"
-                                    ? departmentData.completionRate
-                                    : (dateRange.filtered ? filteredDateStats.completionRate : departmentData.completionRate)
-                                    }%`,
-                                  background: `linear-gradient(to right, #10b981 ${(dashboardType === "delegation"
-                                    ? departmentData.completionRate
-                                    : (dateRange.filtered ? filteredDateStats.completionRate : departmentData.completionRate)
-                                  ) * 0.8}%, #f59e0b ${(dashboardType === "delegation"
-                                    ? departmentData.completionRate
-                                    : (dateRange.filtered ? filteredDateStats.completionRate : departmentData.completionRate)
-                                  ) * 0.8}%)`
+                                  width: `${misStats.rate}%`,
+                                  background: `linear-gradient(to right, #10b981 ${misStats.rate * 0.8}%, #f59e0b ${misStats.rate * 0.8}%)`
                                 }}
                               >
-                                {dashboardType === "delegation"
-                                  ? departmentData.completionRate
-                                  : (dateRange.filtered ? filteredDateStats.completionRate : departmentData.completionRate)
-                                }%
+                                {misStats.rate}%
                               </div>
                             </div>
                           </div>
                         </div>
                         <p className="text-xs text-purple-600 mt-2">
                           {dashboardType === "delegation" ?
-                            `${departmentData.completedTasks} of ${departmentData.totalTasks} tasks completed in delegation mode (all sheet data)` :
-                            `${dateRange.filtered ? filteredDateStats.completedTasks : departmentData.completedTasks} of ${dateRange.filtered ? filteredDateStats.totalTasks : departmentData.totalTasks} tasks completed in checklist mode`
+                            `${misStats.completed} of ${misStats.total} tasks completed in delegation mode (all sheet data)` :
+                            `${misStats.completed} of ${misStats.total} tasks completed in checklist mode`
                           }
                         </p>
                       </div>
