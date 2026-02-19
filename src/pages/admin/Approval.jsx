@@ -735,13 +735,17 @@ function Approval() {
             { id: "col12", label: "Status", type: "string" },
             { id: "col13", label: "Remarks", type: "string" },
             { id: "col14", label: "Uploaded Image", type: "string" },
-            { id: "col15", label: "Column P", type: "string" },
+            { id: "col15", label: "Image URL P", type: "string" },   // Column P – image 1
             { id: "col16", label: "Column Q", type: "string" },
             { id: "col17", label: "Column R", type: "string" },
             { id: "col18", label: "Column S", type: "string" },
-            { id: "col19", label: "Admin Done", type: "string" }, // Column T for Delegation
+            { id: "col19", label: "Admin Done", type: "string" },     // Column T
             { id: "col20", label: "Column U", type: "string" },
-            { id: "col21", label: "Sub Category", type: "string" }, // Column V
+            { id: "col21", label: "Sub Category", type: "string" },   // Column V
+            { id: "col22", label: "Image URL W", type: "string" },    // Column W – image 2
+            { id: "col23", label: "Image URL X", type: "string" },    // Column X – image 3
+            { id: "col24", label: "Image URL Y", type: "string" },    // Column Y – image 4
+            { id: "col25", label: "Image URL Z", type: "string" },    // Column Z – image 5
           ];
 
           columnHeaders.forEach((header, index) => {
@@ -1488,24 +1492,68 @@ function Approval() {
                                 </div>
                               </td>
 
-                              <td className="px-3 py-4 min-w-[100px]">
-                                {(() => {
-                                  const attachmentCol = history._sheetType === 'delegation' ? history["col15"] : history["col14"];
+                              <td className="px-3 py-4 min-w-[180px]">
+                                {history._sheetType === 'delegation' ? (() => {
+                                  // Gather image URLs from columns P, W, X, Y, Z
+                                  const imageUrls = [
+                                    history["col15"],
+                                    history["col22"],
+                                    history["col23"],
+                                    history["col24"],
+                                    history["col25"],
+                                  ].filter((url) => url && url.toString().trim() !== "");
+
+                                  if (imageUrls.length === 0) {
+                                    return <span className="text-gray-400 text-xs">No attachment</span>;
+                                  }
+
+                                  return (
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {imageUrls.map((url, idx) => (
+                                        <a
+                                          key={idx}
+                                          href={url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          title={`Image ${idx + 1} — click to open`}
+                                          className="relative shrink-0 group"
+                                        >
+                                          <img
+                                            src={url}
+                                            alt={`Attachment ${idx + 1}`}
+                                            className="h-10 w-10 object-cover rounded-md border border-gray-200 shadow-sm group-hover:border-blue-400 group-hover:shadow-md transition-all duration-150"
+                                            onError={(e) => {
+                                              // If image fails to load, show a link button fallback
+                                              e.currentTarget.style.display = 'none';
+                                              e.currentTarget.nextSibling.style.display = 'flex';
+                                            }}
+                                          />
+                                          <span
+                                            style={{ display: 'none' }}
+                                            className="h-10 w-10 items-center justify-center rounded-md border border-blue-300 bg-blue-50 text-blue-600 text-xs font-medium hover:bg-blue-100 transition-colors"
+                                          >
+                                            {idx + 1}
+                                          </span>
+                                          <span className="absolute -top-1.5 -right-1.5 bg-blue-500 text-white text-[9px] font-bold rounded-full h-3.5 w-3.5 flex items-center justify-center shadow">
+                                            {idx + 1}
+                                          </span>
+                                        </a>
+                                      ))}
+                                    </div>
+                                  );
+                                })() : (() => {
+                                  const attachmentCol = history["col14"];
                                   return attachmentCol ? (
-                                    <a href={attachmentCol}
+                                    <a
+                                      href={attachmentCol}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-blue-600 hover:text-blue-800 underline flex items-center break-words"
+                                      className="text-blue-600 hover:text-blue-800 underline flex items-center break-words text-sm"
                                     >
-                                      {/* <img
-                        src={attachmentCol || "/placeholder.svg?height=32&width=32"}
-                        alt="Attachment"
-                        className="h-8 w-8 object-cover rounded-md mr-2 flex-shrink-0"
-                      /> */}
-                                      <span className="break-words">View</span>
+                                      <span>View</span>
                                     </a>
                                   ) : (
-                                    <span className="text-gray-400">No attachment</span>
+                                    <span className="text-gray-400 text-xs">No attachment</span>
                                   );
                                 })()}
                               </td>

@@ -54,6 +54,7 @@ function useDebounce(value, delay) {
 }
 
 function DelegationDataPage() {
+  const MAX_IMAGES = 5;
   const [accountData, setAccountData] = useState([]);
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -211,6 +212,14 @@ function DelegationDataPage() {
       return;
     }
 
+    // Check limit before capturing
+    const currentItem = accountData.find(a => a._id === currentCaptureId);
+    if ((currentItem?.images || []).length >= MAX_IMAGES) {
+      alert(`Maximum of ${MAX_IMAGES} images allowed per task.`);
+      stopCamera();
+      return;
+    }
+
     const video = videoRef.current;
 
     try {
@@ -261,9 +270,16 @@ function DelegationDataPage() {
 
       stopCamera();
 
-      handleImageUpload(currentCaptureId, { target: { files: [file] } });
+      // Append to images array (multiple images support)
+      setAccountData((prev) =>
+        prev.map((item) =>
+          item._id === currentCaptureId
+            ? { ...item, images: [...(item.images || []), file] }
+            : item,
+        ),
+      );
 
-      alert("✅ Photo captured successfully!");
+      alert("✅ Photo captured and added successfully!");
     } catch (error) {
       console.error("❌ Capture error:", error);
       alert("Failed to capture photo: " + error.message);
@@ -930,7 +946,15 @@ function DelegationDataPage() {
                   ? parseGoogleSheetsDateTime(String(rowValues[3]))
                   : ""; // Next Target Date with datetime
                 rowData["col4"] = rowValues[4] || "";
-                rowData["col5"] = rowValues[5] || "";
+
+                // MULTI-COLUMN IMAGES: Aggregate from F(5), N(13), O(14), P(15), Q(16)
+                const imageColumns = [5, 13, 14, 15, 16];
+                const images = imageColumns
+                  .map(idx => rowValues[idx])
+                  .filter(val => val && String(val).trim().startsWith("http"));
+
+                rowData["col5"] = images.join("  ,  ");
+
                 rowData["col6"] = rowValues[6] || "";
                 rowData["col7"] = rowValues[7] || ""; // Column H - User name
                 rowData["col8"] = rowValues[8] || ""; // Column I - Task
@@ -1108,11 +1132,39 @@ function DelegationDataPage() {
   );
 
   const handleImageUpload = useCallback(async (id, e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
 
     setAccountData((prev) =>
-      prev.map((item) => (item._id === id ? { ...item, image: file } : item)),
+      prev.map((item) => {
+        if (item._id !== id) return item;
+        const currentCount = (item.images || []).length;
+        if (currentCount >= MAX_IMAGES) {
+          alert(`Limit reached: You can only upload up to ${MAX_IMAGES} images.`);
+          return item;
+        }
+
+        const availableSlots = MAX_IMAGES - currentCount;
+        if (files.length > availableSlots) {
+          alert(`You can only add ${availableSlots} more image(s). Only the first ${availableSlots} will be added.`);
+        }
+
+        const filesToAdd = files.slice(0, availableSlots);
+        return { ...item, images: [...(item.images || []), ...filesToAdd] };
+      }),
+    );
+    // Reset the input so the same file can be re-selected
+    e.target.value = "";
+  }, [MAX_IMAGES]);
+
+  const handleRemoveImage = useCallback((id, index) => {
+    setAccountData((prev) =>
+      prev.map((item) => {
+        if (item._id !== id) return item;
+        const newImages = [...(item.images || [])];
+        newImages.splice(index, 1);
+        return { ...item, images: newImages };
+      }),
     );
   }, []);
 
@@ -1274,7 +1326,7 @@ function DelegationDataPage() {
       const item = accountData.find((account) => account._id === id);
       const requiresAttachment =
         item["col9"] && item["col9"].toUpperCase() === "YES";
-      return requiresAttachment && !item.image;
+      return requiresAttachment && !(item.images && item.images.length > 0);
     });
 
     if (missingRequiredImages.length > 0) {
@@ -1284,7 +1336,22 @@ function DelegationDataPage() {
       return;
     }
 
+    // ── Network pre-flight check ──────────────────────────────────────────
+    if (!navigator.onLine) {
+      alert(
+        "❌ No internet connection.\n\nPlease check your network and try again.",
+      );
+      return;
+    }
+
     setIsSubmitting(true);
+
+    // Helper: detect network / fetch errors
+    const isNetworkError = (err) =>
+      err instanceof TypeError &&
+      (err.message === "Failed to fetch" ||
+        err.message.includes("NetworkError") ||
+        err.message.includes("ERR_INTERNET_DISCONNECTED"));
 
     try {
       const today = new Date();
@@ -1301,35 +1368,56 @@ function DelegationDataPage() {
             const item = accountData.find((account) => account._id === id);
             let imageUrl = "";
 
-            if (item.image instanceof File) {
-              try {
-                const base64Data = await fileToBase64(item.image);
+            // Upload ALL images and join URLs as "url1 , url2 , url3"
+            const imagesToUpload = (item.images || []).filter(
+              (img) => img instanceof File,
+            );
 
-                const uploadFormData = new FormData();
-                uploadFormData.append("action", "uploadFile");
-                uploadFormData.append("base64Data", base64Data);
-                uploadFormData.append(
-                  "fileName",
-                  `task_${item["col1"]}_${Date.now()}.${item.image.name
-                    .split(".")
-                    .pop()}`,
-                );
-                uploadFormData.append("mimeType", item.image.type);
-                uploadFormData.append("folderId", CONFIG.DRIVE_FOLDER_ID);
+            const uploadedUrls = [];
+            if (imagesToUpload.length > 0) {
+              for (let imgIdx = 0; imgIdx < imagesToUpload.length; imgIdx++) {
+                const imgFile = imagesToUpload[imgIdx];
+                try {
+                  const base64Data = await fileToBase64(imgFile);
 
-                const uploadResponse = await fetch(CONFIG.APPS_SCRIPT_URL, {
-                  method: "POST",
-                  body: uploadFormData,
-                });
+                  const uploadFormData = new FormData();
+                  uploadFormData.append("action", "uploadFile");
+                  uploadFormData.append("base64Data", base64Data);
+                  uploadFormData.append(
+                    "fileName",
+                    `task_${item["col1"]}_${Date.now()}_${imgIdx}.${imgFile.name
+                      .split(".")
+                      .pop()}`,
+                  );
+                  uploadFormData.append("mimeType", imgFile.type);
+                  uploadFormData.append("folderId", CONFIG.DRIVE_FOLDER_ID);
 
-                const uploadResult = await uploadResponse.json();
-                if (uploadResult.success) {
-                  imageUrl = uploadResult.fileUrl;
+                  const uploadResponse = await fetch(CONFIG.APPS_SCRIPT_URL, {
+                    method: "POST",
+                    body: uploadFormData,
+                  });
+
+                  const uploadResult = await uploadResponse.json();
+                  if (uploadResult.success) {
+                    uploadedUrls.push(uploadResult.fileUrl);
+                  }
+                } catch (uploadError) {
+                  console.error(`Error uploading image ${imgIdx}:`, uploadError);
+                  if (isNetworkError(uploadError)) {
+                    throw new Error(
+                      "NO_INTERNET: Image upload failed — no internet connection.",
+                    );
+                  }
                 }
-              } catch (uploadError) {
-                console.error("Error uploading image:", uploadError);
               }
             }
+
+            // Split into up to 5 separate column values
+            const img1 = uploadedUrls[0] || "";
+            const img2 = uploadedUrls[1] || "";
+            const img3 = uploadedUrls[2] || "";
+            const img4 = uploadedUrls[3] || "";
+            const img5 = uploadedUrls[4] || "";
 
             // UPDATED: Use properly formatted datetime for submission
             // Format the next target date properly if it exists - NOW WITH DATETIME FORMAT
@@ -1344,22 +1432,25 @@ function DelegationDataPage() {
               nextTargetDateTimeForGoogleSheets = convertedDateTime.dateObject;
             }
 
-            // Updated to include username in column H and task description in column I when submitting to history
+            // Updated to distribute images across F, N, O, P, Q
             const newRowData = [
-              dateTimeForSubmission.formatted, // Use formatted datetime string - DD/MM/YYYY HH:MM:SS
-              item["col1"] || "",
-              statusData[id] || "",
-              formattedNextTargetDateTime, // Use properly formatted next target datetime - DD/MM/YYYY HH:MM:SS
-              remarksData[id] || "",
-              imageUrl,
-              "", // Column G
-              username, // Column H - Store the logged-in username
-              item["col5"] || "", // Column I - Task description from col5
-
-              item["col3"] || "", // Column J - Given By from original task
-              "", // Column K - Empty
-              "", // Column L - Empty
-              item["col21"] || "", // Column M - Sub Category from col21
+              dateTimeForSubmission.formatted, // 0: A
+              item["col1"] || "",              // 1: B
+              statusData[id] || "",            // 2: C
+              formattedNextTargetDateTime,     // 3: D
+              remarksData[id] || "",           // 4: E
+              img1,                            // 5: F (Image 1)
+              "",                              // 6: G
+              username,                        // 7: H
+              item["col5"] || "",              // 8: I
+              item["col3"] || "",              // 9: J
+              "",                              // 10: K
+              "",                              // 11: L
+              item["col21"] || "",             // 12: M (Sub Category)
+              img2,                            // 13: N (Image 2)
+              img3,                            // 14: O (Image 3)
+              img4,                            // 15: P (Image 4)
+              img5,                            // 16: Q (Image 5)
             ];
 
             const insertFormData = new FormData();
@@ -1392,10 +1483,19 @@ function DelegationDataPage() {
               );
             }
 
-            return fetch(CONFIG.APPS_SCRIPT_URL, {
-              method: "POST",
-              body: insertFormData,
-            });
+            try {
+              return await fetch(CONFIG.APPS_SCRIPT_URL, {
+                method: "POST",
+                body: insertFormData,
+              });
+            } catch (insertError) {
+              if (isNetworkError(insertError)) {
+                throw new Error(
+                  "NO_INTERNET: Submission failed — no internet connection.",
+                );
+              }
+              throw insertError;
+            }
           }),
         );
       }
@@ -1418,7 +1518,13 @@ function DelegationDataPage() {
       }, 2000);
     } catch (error) {
       console.error("Submission error:", error);
-      alert("Failed to submit task records: " + error.message);
+      if (error.message && error.message.startsWith("NO_INTERNET:")) {
+        alert(
+          "❌ No internet connection.\n\nPlease check your network and try again. Your selections are still saved — you can retry after reconnecting.",
+        );
+      } else {
+        alert("Failed to submit task records: " + error.message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -1794,23 +1900,33 @@ function DelegationDataPage() {
                           </td>
                           <td className="px-6 py-4 min-w-[120px]">
                             {history["col5"] ? (
-                              <a
-                                href={history["col5"]}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 underline flex items-center"
-                              >
-                                <img
-                                  src={
-                                    history["col5"] || "/api/placeholder/32/32"
-                                  }
-                                  alt="Attachment"
-                                  className="h-8 w-8 object-cover rounded-md mr-2"
-                                />
-                                <span className="text-xs whitespace-normal break-words">
-                                  View
-                                </span>
-                              </a>
+                              <div className="flex flex-col gap-2">
+                                {history["col5"]
+                                  .split(" , ")
+                                  .map((url, urlIdx) =>
+                                    url.trim() ? (
+                                      <a
+                                        key={urlIdx}
+                                        href={url.trim()}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+                                      >
+                                        <img
+                                          src={url.trim()}
+                                          alt={`Attachment ${urlIdx + 1}`}
+                                          className="h-8 w-8 object-cover rounded-md"
+                                          onError={(e) =>
+                                            (e.target.style.display = "none")
+                                          }
+                                        />
+                                        <span className="text-xs whitespace-normal break-words">
+                                          View {urlIdx + 1}
+                                        </span>
+                                      </a>
+                                    ) : null,
+                                  )}
+                              </div>
                             ) : (
                               <span className="text-gray-400 text-xs">
                                 No attachment
@@ -1923,27 +2039,39 @@ function DelegationDataPage() {
                           </div>
                         </div>
 
-                        {/* Uploaded Image */}
-                        <div className="flex justify-between items-center">
+                        {/* Uploaded Image - Multiple */}
+                        <div className="flex justify-between items-start">
                           <span className="font-medium text-gray-700">
                             Attachment:
                           </span>
                           {history["col5"] ? (
-                            <a
-                              href={history["col5"]}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 underline flex items-center"
-                            >
-                              <img
-                                src={
-                                  history["col5"] || "/api/placeholder/32/32"
-                                }
-                                alt="Attachment"
-                                className="h-8 w-8 object-cover rounded-md mr-2"
-                              />
-                              <span className="text-xs break-words">View</span>
-                            </a>
+                            <div className="flex flex-wrap gap-2 justify-end">
+                              {history["col5"]
+                                .split(" , ")
+                                .map((url, urlIdx) =>
+                                  url.trim() ? (
+                                    <a
+                                      key={urlIdx}
+                                      href={url.trim()}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+                                    >
+                                      <img
+                                        src={url.trim()}
+                                        alt={`Attachment ${urlIdx + 1}`}
+                                        className="h-8 w-8 object-cover rounded-md"
+                                        onError={(e) =>
+                                          (e.target.style.display = "none")
+                                        }
+                                      />
+                                      <span className="text-xs break-words">
+                                        View {urlIdx + 1}
+                                      </span>
+                                    </a>
+                                  ) : null,
+                                )}
+                            </div>
                           ) : (
                             <span className="text-gray-400 text-xs">
                               No attachment
@@ -2244,57 +2372,69 @@ function DelegationDataPage() {
                                 rows="2"
                               />
                             </td>
-                            {/* Upload Image */}
-                            <td className="px-3 md:px-6 py-2 md:py-4 whitespace-nowrap w-[160px]">
-                              {account.image ? (
-                                <div className="flex items-center">
-                                  <img
-                                    src={
-                                      typeof account.image === "string"
-                                        ? account.image
-                                        : URL.createObjectURL(account.image)
-                                    }
-                                    alt="Receipt"
-                                    className="h-10 w-10 object-cover rounded-md mr-2"
-                                  />
-                                  <div className="flex flex-col">
-                                    <span className="text-xs text-gray-500">
-                                      {account.image instanceof File
-                                        ? account.image.name
-                                        : "Uploaded Receipt"}
-                                    </span>
-                                    {account.image instanceof File ? (
-                                      <span className="text-xs text-green-600">
-                                        Ready to upload
-                                      </span>
-                                    ) : (
-                                      <button
-                                        className="text-xs text-purple-600 hover:text-purple-800"
-                                        onClick={() =>
-                                          window.open(account.image, "_blank")
-                                        }
-                                      >
-                                        View Full Image
-                                      </button>
-                                    )}
+                            {/* Upload Image - Multiple */}
+                            <td className="px-3 md:px-6 py-2 md:py-4 w-[200px]">
+                              <div className="flex flex-col gap-2">
+                                {/* Thumbnails for already-selected images */}
+                                {(account.images || []).length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {(account.images || []).map((img, idx) => (
+                                      <div key={idx} className="relative group">
+                                        <img
+                                          src={
+                                            img instanceof File
+                                              ? URL.createObjectURL(img)
+                                              : img
+                                          }
+                                          alt={`Image ${idx + 1}`}
+                                          className="h-10 w-10 object-cover rounded-md border border-gray-300"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleRemoveImage(account._id, idx)
+                                          }
+                                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                          title={`Remove image ${idx + 1}`}
+                                        >
+                                          ×
+                                        </button>
+                                      </div>
+                                    ))}
                                   </div>
-                                </div>
-                              ) : (
-                                <div className="flex flex-col gap-2">
+                                )}
+
+                                {/* Add more images label + camera */}
+                                <div
+                                  className={`flex flex-col gap-1 ${!isSelected || isDisabled
+                                    ? "pointer-events-none opacity-50"
+                                    : ""
+                                    }`}
+                                >
                                   <label
                                     htmlFor={`upload-${account._id}`}
-                                    className={`flex items-center cursor-pointer ${account["col9"]?.toUpperCase() === "YES"
-                                      ? "text-red-600 font-medium"
-                                      : "text-purple-600 hover:text-purple-800"
-                                      } ${isDisabled ? "pointer-events-none opacity-50" : ""}`}
+                                    className={`flex items-center ${(account.images || []).length >= MAX_IMAGES
+                                      ? "text-gray-400 cursor-not-allowed"
+                                      : "cursor-pointer text-purple-600 hover:text-purple-800"
+                                      } ${account["col9"]?.toUpperCase() === "YES" &&
+                                        !(account.images || []).length
+                                        ? "text-red-600 font-medium"
+                                        : ""
+                                      }`}
                                   >
                                     <Upload className="h-4 w-4 mr-1" />
                                     <span className="text-xs">
-                                      {account["col9"]?.toUpperCase() === "YES"
-                                        ? "Required Upload"
-                                        : "Upload Image"}
+                                      {(account.images || []).length >= MAX_IMAGES
+                                        ? "Limit Reached"
+                                        : (account.images || []).length > 0
+                                          ? "Add More"
+                                          : account["col9"]?.toUpperCase() ===
+                                            "YES"
+                                            ? "Required Upload"
+                                            : "Upload Image"}
                                       {account["col9"]?.toUpperCase() ===
-                                        "YES" && (
+                                        "YES" &&
+                                        !(account.images || []).length && (
                                           <span className="text-red-500 ml-1">
                                             *
                                           </span>
@@ -2307,29 +2447,103 @@ function DelegationDataPage() {
                                     type="file"
                                     className="hidden"
                                     accept="image/*"
+                                    multiple
                                     onChange={(e) =>
                                       handleImageUpload(account._id, e)
                                     }
-                                    disabled={!isSelected || isDisabled}
+                                    disabled={!isSelected || isDisabled || (account.images || []).length >= MAX_IMAGES}
                                   />
 
                                   <button
                                     onClick={() => {
-                                      if (!isSelected || isDisabled) return;
+                                      if (!isSelected || isDisabled || (account.images || []).length >= MAX_IMAGES) return;
                                       setCurrentCaptureId(account._id);
                                       startCamera();
                                     }}
-                                    className="flex items-center text-blue-600 hover:text-blue-800 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className={`flex items-center text-xs ${(account.images || []).length >= MAX_IMAGES
+                                      ? "text-gray-400 cursor-not-allowed"
+                                      : "text-blue-600 hover:text-blue-800"
+                                      }`}
+                                    disabled={(account.images || []).length >= MAX_IMAGES}
                                   >
                                     <Camera className="h-4 w-4 mr-1" />
                                     <span>
-                                      {isCameraLoading
+                                      {isCameraLoading &&
+                                        currentCaptureId === account._id
                                         ? "Loading..."
                                         : "Take Photo"}
                                     </span>
                                   </button>
+
+                                  {/* Folder upload */}
+                                  <label
+                                    htmlFor={`folder-${account._id}`}
+                                    className={`flex items-center cursor-pointer text-xs ${!isSelected || isDisabled || (account.images || []).length >= MAX_IMAGES
+                                      ? "text-gray-400 pointer-events-none"
+                                      : "text-amber-600 hover:text-amber-800"
+                                      }`}
+                                    title={(account.images || []).length >= MAX_IMAGES ? "Limit reached" : "Select a folder — all images inside will be added"}
+                                  >
+                                    <span className="mr-1">📁</span>
+                                    <span>Folder</span>
+                                  </label>
+                                  <input
+                                    id={`folder-${account._id}`}
+                                    type="file"
+                                    className="hidden"
+                                    webkitdirectory=""
+                                    multiple
+                                    onChange={(e) => {
+                                      const currentCount = (account.images || []).length;
+                                      if (currentCount >= MAX_IMAGES) return;
+
+                                      const allFiles = Array.from(
+                                        e.target.files || [],
+                                      );
+                                      const imageFiles = allFiles.filter((f) =>
+                                        f.type.startsWith("image/"),
+                                      );
+
+                                      if (!imageFiles.length) {
+                                        alert(
+                                          "No image files found in the selected folder.",
+                                        );
+                                        return;
+                                      }
+
+                                      const availableSlots = MAX_IMAGES - currentCount;
+                                      if (imageFiles.length > availableSlots) {
+                                        alert(`Limit: Only adding the first ${availableSlots} images to stay within the 5-image limit.`);
+                                      }
+
+                                      const filesToAdd = imageFiles.slice(0, availableSlots);
+
+                                      setAccountData((prev) =>
+                                        prev.map((item) =>
+                                          item._id === account._id
+                                            ? {
+                                              ...item,
+                                              images: [
+                                                ...(item.images || []),
+                                                ...filesToAdd,
+                                              ],
+                                            }
+                                            : item,
+                                        ),
+                                      );
+                                      e.target.value = "";
+                                    }}
+                                    disabled={!isSelected || isDisabled || (account.images || []).length >= MAX_IMAGES}
+                                  />
                                 </div>
-                              )}
+
+                                {(account.images || []).length > 0 && (
+                                  <span className="text-xs text-green-600">
+                                    {account.images.length} image
+                                    {account.images.length > 1 ? "s" : ""} ready
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             {userRole === "admin" && (
                               <td className="px-6 py-4 whitespace-nowrap">
@@ -2557,86 +2771,143 @@ function DelegationDataPage() {
                             />
                           </div>
 
-                          {/* ✅ CAMERA + GALLERY BUTTONS */}
+                          {/* ✅ MULTIPLE IMAGES - CAMERA + GALLERY */}
                           <div className="text-sm">
                             <span className="font-medium">Upload Image: </span>
-                            {account.image ? (
-                              <div className="flex items-center mt-2">
-                                <img
-                                  src={
-                                    typeof account.image === "string"
-                                      ? account.image
-                                      : URL.createObjectURL(account.image)
-                                  }
-                                  alt="Receipt"
-                                  className="h-10 w-10 object-cover rounded-md mr-2"
-                                />
-                                <div className="flex flex-col">
-                                  <span className="text-xs text-gray-500">
-                                    {account.image instanceof File
-                                      ? account.image.name
-                                      : "Uploaded Receipt"}
-                                  </span>
-                                  {account.image instanceof File ? (
-                                    <span className="text-xs text-green-600">
-                                      Ready to upload
-                                    </span>
-                                  ) : (
-                                    <button
-                                      className="text-xs text-purple-600 hover:text-purple-800"
-                                      onClick={() =>
-                                        window.open(account.image, "_blank")
-                                      }
-                                    >
-                                      View Full Image
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex items-center space-x-2 mt-2">
-                                <button
-                                  onClick={() => {
-                                    if (!isSelected || isDisabled) return;
-                                    setCurrentCaptureId(account._id);
-                                    startCamera();
-                                  }}
-                                  disabled={!isSelected || isDisabled}
-                                  className={`flex items-center px-3 py-2 rounded-lg border-2 text-sm font-medium ${isSelected
-                                    ? "bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 shadow-md"
-                                    : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
-                                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                                >
-                                  <Camera className="h-4 w-4 mr-1" />
-                                  <span>Camera</span>
-                                </button>
 
-                                <label
-                                  className={`flex items-center px-3 py-2 rounded-lg border-2 text-sm font-medium ${isSelected
-                                    ? account["col9"]?.toUpperCase() === "YES"
-                                      ? "bg-red-50 border-red-300 text-red-700 hover:bg-red-100 shadow-md"
-                                      : "bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100 shadow-md"
-                                    : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
-                                    }`}
-                                >
-                                  <Upload className="h-4 w-4 mr-1" />
-                                  <span>
-                                    {account["col9"]?.toUpperCase() === "YES"
-                                      ? "Required*"
-                                      : "Gallery"}
-                                  </span>
-                                  <input
-                                    type="file"
-                                    className="hidden"
-                                    accept="image/*"
-                                    onChange={(e) =>
-                                      handleImageUpload(account._id, e)
-                                    }
-                                    disabled={!isSelected || isDisabled}
-                                  />
-                                </label>
+                            {/* Thumbnails */}
+                            {(account.images || []).length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {(account.images || []).map((img, idx) => (
+                                  <div key={idx} className="relative group">
+                                    <img
+                                      src={
+                                        img instanceof File
+                                          ? URL.createObjectURL(img)
+                                          : img
+                                      }
+                                      alt={`Image ${idx + 1}`}
+                                      className="h-10 w-10 object-cover rounded-md border border-gray-300"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleRemoveImage(account._id, idx)
+                                      }
+                                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
                               </div>
                             )}
+
+                            {(account.images || []).length > 0 && (
+                              <span className="block text-xs text-green-600 mt-1">
+                                {account.images.length} image
+                                {account.images.length > 1 ? "s" : ""} selected
+                              </span>
+                            )}
+
+                            {/* Buttons */}
+                            <div className="flex items-center space-x-2 mt-2">
+                              <button
+                                onClick={() => {
+                                  if (!isSelected || isDisabled || (account.images || []).length >= MAX_IMAGES) return;
+                                  setCurrentCaptureId(account._id);
+                                  startCamera();
+                                }}
+                                disabled={!isSelected || isDisabled || (account.images || []).length >= MAX_IMAGES}
+                                className={`flex items-center px-3 py-2 rounded-lg border-2 text-sm font-medium ${isSelected && (account.images || []).length < MAX_IMAGES
+                                  ? "bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 shadow-md"
+                                  : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
+                                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                              >
+                                <Camera className="h-4 w-4 mr-1" />
+                                <span>Camera</span>
+                              </button>
+
+                              <label
+                                className={`flex items-center px-3 py-2 rounded-lg border-2 text-sm font-medium ${isSelected && (account.images || []).length < MAX_IMAGES
+                                  ? (account.images || []).length > 0
+                                    ? "bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100 shadow-md cursor-pointer"
+                                    : account["col9"]?.toUpperCase() === "YES"
+                                      ? "bg-red-50 border-red-300 text-red-700 hover:bg-red-100 shadow-md cursor-pointer"
+                                      : "bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100 shadow-md cursor-pointer"
+                                  : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
+                                  }`}
+                              >
+                                <Upload className="h-4 w-4 mr-1" />
+                                <span>
+                                  {(account.images || []).length >= MAX_IMAGES
+                                    ? "Full"
+                                    : (account.images || []).length > 0
+                                      ? "Add More"
+                                      : account["col9"]?.toUpperCase() === "YES"
+                                        ? "Required*"
+                                        : "Gallery"}
+                                </span>
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept="image/*"
+                                  multiple
+                                  onChange={(e) =>
+                                    handleImageUpload(account._id, e)
+                                  }
+                                  disabled={!isSelected || isDisabled || (account.images || []).length >= MAX_IMAGES}
+                                />
+                              </label>
+
+                              {/* Folder upload — mobile */}
+                              <label
+                                className={`flex items-center px-3 py-2 rounded-lg border-2 text-sm font-medium ${isSelected && !isDisabled && (account.images || []).length < MAX_IMAGES
+                                    ? "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 shadow-md cursor-pointer"
+                                    : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
+                                  }`}
+                                title={(account.images || []).length >= MAX_IMAGES ? "Limit reached" : "Select a folder — all images inside will be added"}
+                              >
+                                <span className="mr-1">📁</span>
+                                <span>Folder</span>
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  webkitdirectory=""
+                                  multiple
+                                  onChange={(e) => {
+                                    if (!isSelected || isDisabled || (account.images || []).length >= MAX_IMAGES) return;
+                                    const allFiles = Array.from(
+                                      e.target.files || [],
+                                    );
+                                    const imageFiles = allFiles.filter((f) =>
+                                      f.type.startsWith("image/"),
+                                    );
+                                    if (!imageFiles.length) {
+                                      alert(
+                                        "No image files found in the selected folder.",
+                                      );
+                                      return;
+                                    }
+                                    setAccountData((prev) =>
+                                      prev.map((item) =>
+                                        item._id === account._id
+                                          ? {
+                                            ...item,
+                                            images: [
+                                              ...(item.images || []),
+                                              ...imageFiles,
+                                            ],
+                                          }
+                                          : item,
+                                      ),
+                                    );
+                                    e.target.value = "";
+                                  }}
+                                  disabled={!isSelected || isDisabled}
+                                />
+                              </label>
+                            </div>
                           </div>
                           {userRole === "admin" && (
                             <div className="mt-3">
