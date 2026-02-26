@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState, useCallback, useRef } from "react";
 import { format } from 'date-fns';
-import { Search, ChevronDown, Filter } from "lucide-react";
+import { Search, ChevronDown, Filter, Trash2 } from "lucide-react";
 import AdminLayout from "../components/layout/AdminLayout";
 import DelegationPage from "./delegation-data";
 
@@ -28,6 +28,7 @@ export default function QuickTask() {
   const [editedData, setEditedData] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const dropdownRef = useRef(null);
+  const [deletingRows, setDeletingRows] = useState(new Set());
 
 
   useEffect(() => {
@@ -117,6 +118,7 @@ export default function QuickTask() {
       [taskId]: { ...prev[taskId], [field]: value }
     }));
   };
+
 
   const formatDateForSheet = (dateString) => {
     if (!dateString) return '';
@@ -387,7 +389,7 @@ export default function QuickTask() {
             'Sub Category': row.c[14]?.v || "", // Column O (Index 14)
             'Task Description': row.c[5]?.v || "",
             'End Date': startDateValue, // Use processed date
-             'Next Task Date': formatDate(row.c[11]?.v) || "", 
+            'Next Task Date': formatDate(row.c[11]?.v) || "",
             Frequency: row.c[7]?.v || "",
             Reminders: row.c[8]?.v || "",
             Attachment: row.c[9]?.v || "",
@@ -432,6 +434,60 @@ export default function QuickTask() {
       setLoading(false);
     }
   }, [currentUser, userRole, userLoading]);
+
+  // Permanent delete selected tasks from Unique sheet (deletes from bottom to top)
+  const handleDeleteSelectedTasks = useCallback(async () => {
+    if (selectedRows.size === 0) return;
+    if (!confirm(`Are you sure you want to permanently delete ${selectedRows.size} selected task(s)? This cannot be undone.`)) return;
+
+    // Get selected tasks sorted by row index descending (delete bottom-to-top to avoid index shifting)
+    const selectedTasks = tasks
+      .filter(t => selectedRows.has(t._id))
+      .sort((a, b) => b._rowIndex - a._rowIndex);
+
+    setDeletingRows(new Set(selectedTasks.map(t => t._id)));
+    let deletedCount = 0;
+    let failedCount = 0;
+
+    const userAppScriptUrl = "https://script.google.com/macros/s/AKfycbw7hMLxUdRO4Gl_JRLtl2B5Q_FRJuCaOPC7dj_Ezvk1EPbUJR6q88AMF0oQtPCoFoFi/exec";
+
+    for (const task of selectedTasks) {
+      if (!task._rowIndex) { failedCount++; continue; }
+      try {
+        const formData = new FormData();
+        formData.append("sheetName", CONFIG.CHECKLIST_SHEET);
+        formData.append("sheet", CONFIG.CHECKLIST_SHEET);
+        formData.append("action", "deleteRow");
+        formData.append("rowIndex", String(task._rowIndex));
+        formData.append("taskId", task['Task ID'] || "");
+
+        const response = await fetch(userAppScriptUrl, { method: "POST", body: formData });
+        const text = await response.text();
+        let result;
+        try { result = JSON.parse(text); } catch (e) { result = { success: response.ok }; }
+
+        if (result.success) {
+          deletedCount++;
+          setTasks(prev => prev.filter(t => t._id !== task._id));
+        } else { failedCount++; }
+      } catch (err) {
+        console.error("Delete failed for task:", task['Task ID'], err);
+        failedCount++;
+      }
+    }
+
+    if (failedCount === 0) {
+      alert(`${deletedCount} task(s) deleted successfully.`);
+    } else {
+      alert(`${deletedCount} deleted, ${failedCount} failed.`);
+    }
+
+    setSelectedRows(new Set());
+    setEditingRows(new Set());
+    setEditedData({});
+    setTimeout(() => fetchChecklistData(), 1000);
+    setDeletingRows(new Set());
+  }, [selectedRows, tasks, fetchChecklistData]);
 
   const fetchDelegationData = useCallback(async () => {
     if (!currentUser || userLoading) return;
@@ -813,9 +869,26 @@ export default function QuickTask() {
                 </p>
               </div>
 
-              {/* Submit Button */}
+              {/* Submit & Delete Buttons */}
               {selectedRows.size > 0 && (
-                <div className="mb-4 flex justify-end p-4 bg-blue-50 border-b">
+                <div className="mb-4 flex justify-end gap-3 p-4 bg-blue-50 border-b">
+                  <button
+                    onClick={handleDeleteSelectedTasks}
+                    disabled={deletingRows.size > 0}
+                    className="bg-red-400 hover:bg-red-500 disabled:bg-gray-400 text-white px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5"
+                  >
+                    {deletingRows.size > 0 ? (
+                      <>
+                        <div className="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 size={16} />
+                        {`Delete ${selectedRows.size} Selected`}
+                      </>
+                    )}
+                  </button>
                   <button
                     onClick={submitSelectedTasks}
                     disabled={submitting}
@@ -858,7 +931,7 @@ export default function QuickTask() {
                         { key: 'Name', label: 'Name' },
                         { key: 'Task Description', label: 'Task Description', minWidth: 'min-w-[300px]' },
                         { key: 'End Date', label: 'End Date', bg: 'bg-yellow-50' },
-              { key: 'Next Task Date', label: 'Next Task Date', bg: 'bg-blue-50' }, // NEW
+                        { key: 'Next Task Date', label: 'Next Task Date', bg: 'bg-blue-50' }, // NEW
                         { key: 'Frequency', label: 'Frequency' },
                         { key: 'Reminders', label: 'Reminders' },
                         { key: 'Attachment', label: 'Attachment' },
@@ -1007,40 +1080,40 @@ export default function QuickTask() {
                                 formatDate(task['End Date']) || "—"
                               )}
                             </td>
-<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-blue-50">
-  {isEditing ? (
-    <input
-      type="datetime-local"
-      value={
-        editedTask['Next Task Date']
-          ? editedTask['Next Task Date']
-              .split(' ')[0]
-              .split('/')
-              .reverse()
-              .join('-') +
-            'T' +
-            (editedTask['Next Task Date'].split(' ')[1] || '00:00')
-          : ''
-      }
-      onChange={(e) => {
-        if (e.target.value) {
-          const [date, time] = e.target.value.split('T');
-          const [year, month, day] = date.split('-');
-          handleInputChange(
-            task._id,
-            'Next Task Date',
-            `${day}/${month}/${year} ${time}:00`
-          );
-        } else {
-          handleInputChange(task._id, 'Next Task Date', '');
-        }
-      }}
-      className="px-2 py-1 border border-gray-300 rounded text-sm"
-    />
-  ) : (
-    formatDate(task['Next Task Date']) || "—"
-  )}
-</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-blue-50">
+                              {isEditing ? (
+                                <input
+                                  type="datetime-local"
+                                  value={
+                                    editedTask['Next Task Date']
+                                      ? editedTask['Next Task Date']
+                                        .split(' ')[0]
+                                        .split('/')
+                                        .reverse()
+                                        .join('-') +
+                                      'T' +
+                                      (editedTask['Next Task Date'].split(' ')[1] || '00:00')
+                                      : ''
+                                  }
+                                  onChange={(e) => {
+                                    if (e.target.value) {
+                                      const [date, time] = e.target.value.split('T');
+                                      const [year, month, day] = date.split('-');
+                                      handleInputChange(
+                                        task._id,
+                                        'Next Task Date',
+                                        `${day}/${month}/${year} ${time}:00`
+                                      );
+                                    } else {
+                                      handleInputChange(task._id, 'Next Task Date', '');
+                                    }
+                                  }}
+                                  className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                />
+                              ) : (
+                                formatDate(task['Next Task Date']) || "—"
+                              )}
+                            </td>
 
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {isEditing ? (
@@ -1153,11 +1226,13 @@ export default function QuickTask() {
                                 {isSelected ? 'Selected' : 'Select Task'}
                               </span>
                             </label>
-                            {isEditing && (
-                              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
-                                Editing Mode
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {isEditing && (
+                                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                                  Editing Mode
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           <div className="space-y-3">
@@ -1273,11 +1348,11 @@ export default function QuickTask() {
                               )}
                             </div>
                             <div className="flex justify-between items-center border-b pb-2">
-  <span className="font-medium text-gray-700">Next Task Date:</span>
-  <div className="text-sm text-gray-900 break-words bg-blue-50 px-2 py-1 rounded text-right w-[35%]">
-    {formatDate(task['Next Task Date']) || "—"}
-  </div>
-</div>
+                              <span className="font-medium text-gray-700">Next Task Date:</span>
+                              <div className="text-sm text-gray-900 break-words bg-blue-50 px-2 py-1 rounded text-right w-[35%]">
+                                {formatDate(task['Next Task Date']) || "—"}
+                              </div>
+                            </div>
 
                             <div className="flex justify-between items-center border-b pb-2">
                               <span className="font-medium text-gray-700">Frequency:</span>

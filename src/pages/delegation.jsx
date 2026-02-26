@@ -2184,11 +2184,7 @@ function DelegationDataPage() {
                       >
                         Upload Image
                       </th>
-                      {userRole === "admin" && (
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
-                          Delete
-                        </th>
-                      )}
+
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -2545,22 +2541,7 @@ function DelegationDataPage() {
                                 )}
                               </div>
                             </td>
-                            {userRole === "admin" && (
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteRow(account);
-                                  }}
-                                  disabled={deletingRows.has(account._id)}
-                                  className="text-red-600 hover:text-red-800 text-sm font-medium disabled:opacity-50"
-                                >
-                                  {deletingRows.has(account._id)
-                                    ? "Deleting..."
-                                    : "Delete"}
-                                </button>
-                              </td>
-                            )}
+
                           </tr>
                         );
                       })
@@ -2863,8 +2844,8 @@ function DelegationDataPage() {
                               {/* Folder upload — mobile */}
                               <label
                                 className={`flex items-center px-3 py-2 rounded-lg border-2 text-sm font-medium ${isSelected && !isDisabled && (account.images || []).length < MAX_IMAGES
-                                    ? "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 shadow-md cursor-pointer"
-                                    : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
+                                  ? "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 shadow-md cursor-pointer"
+                                  : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
                                   }`}
                                 title={(account.images || []).length >= MAX_IMAGES ? "Limit reached" : "Select a folder — all images inside will be added"}
                               >
@@ -2909,23 +2890,7 @@ function DelegationDataPage() {
                               </label>
                             </div>
                           </div>
-                          {userRole === "admin" && (
-                            <div className="mt-3">
-                              <button
-                                onClick={() => {
-                                  if (!isSelected) return;
-                                  if (!confirm("Delete permanently?")) return;
-                                  handleDeleteRow(account);
-                                }}
-                                disabled={deletingRows.has(account._id)}
-                                className="w-full py-2 rounded-lg border-2 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50"
-                              >
-                                {deletingRows.has(account._id)
-                                  ? "Deleting..."
-                                  : "Delete Task"}
-                              </button>
-                            </div>
-                          )}
+
                         </div>
                       </div>
                     );

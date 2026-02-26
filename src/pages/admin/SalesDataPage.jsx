@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import {
   useState,
   useEffect,
@@ -923,6 +923,7 @@ function AccountDataPage() {
         const columnGValue = rowValues[6]; // Task Start Date
         const columnKValue = rowValues[10]; // Actual Date (Column K)
         const columnPValue = rowValues[15]; // Admin Processed Date (Column P)
+        const columnSValue = rowValues[18]; // Deleted task (Column S, 0-indexed = 18)
 
         const rowDateStr = columnGValue ? String(columnGValue).trim() : "";
         const formattedRowDate = parseGoogleSheetsDateTime(rowDateStr);
@@ -982,6 +983,9 @@ function AccountDataPage() {
             rowData[header.id] = cellValue !== null ? cellValue : "";
           }
         });
+
+        // ✅ Skip rows where Column S has any value (soft-deleted tasks)
+        if (!isEmpty(columnSValue)) return;
 
         // ✅ ONLY ADD IF COLUMN K IS EMPTY/NULL
         const isColumnKEmpty = isEmpty(columnKValue);
@@ -1109,89 +1113,73 @@ function AccountDataPage() {
     });
   };
 
-  // Delete row handler
+  // Soft delete row handler — marks Column S as "Deleted task" instead of removing the row
   const handleDeleteRow = useCallback(async (account) => {
     if (
       !confirm(
-        "Are you sure you want to delete this task? This action will remove the row permanently from the sheet.",
+        "Are you sure you want to delete this task? It will be hidden from view but remain in the sheet.",
       )
     )
       return;
 
-    if (!account || !account._rowIndex) {
+    const taskId = account._taskId || account["col1"];
+    const rowIndex = account._rowIndex;
+
+    if (!rowIndex) {
       alert("Cannot delete: missing row index for this record.");
+      return;
+    }
+
+    if (!taskId) {
+      alert("Cannot delete: missing Task ID for this record.");
       return;
     }
 
     setDeletingRows((prev) => new Set([...prev, account._id]));
     try {
-      // Try multiple action names and methods (POST, then GET fallback)
-      const actions = [
-        "deleteRow",
-        "removeRow",
-        "delete",
-        "deleteByRowIndex",
-        "deleteByTaskId",
-        "removeByTaskId",
+      // Build payload: send taskId + rowIndex + "Deleted task" field
+      // The backend updateTaskData will:
+      // 1. Verify the row using rowIndex
+      // 2. Match Task ID in Column B to confirm correct row
+      // 3. If mismatch, search for correct row by Task ID
+      // 4. Update Column S ("Deleted task") with "Deleted task"
+      const submissionData = [
+        {
+          taskId: taskId,
+          rowIndex: rowIndex,
+          "Deleted task": "Deleted task",
+        },
       ];
 
-      const parseResponse = async (response) => {
-        const text = await response.text();
-        console.debug("Delete response text:", text);
-        try {
-          return JSON.parse(text);
-        } catch (e) {
-          return { success: response.ok, text };
-        }
-      };
+      const formData = new FormData();
+      formData.append("sheetName", CONFIG.SHEET_NAME);
+      formData.append("action", "updateTaskData");
+      formData.append("rowData", JSON.stringify(submissionData));
 
-      let res = null;
+      const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+        method: "POST",
+        body: formData,
+      });
 
-      for (const action of actions) {
-        const formData = new FormData();
-        // include both keys for compatibility with different server implementations
-        formData.append("sheetName", CONFIG.SHEET_NAME);
-        formData.append("sheet", CONFIG.SHEET_NAME);
-        formData.append("action", action);
-        formData.append("rowIndex", String(account._rowIndex));
-        formData.append("rowNumber", String(account._rowIndex));
-        formData.append("index", String(account._rowIndex));
-        formData.append("taskId", account._taskId || account["col1"] || "");
-        formData.append("rowData", JSON.stringify(account));
+      const responseText = await response.text();
+      console.log("Soft delete response:", responseText);
 
-        const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
-          method: "POST",
-          body: formData,
-        });
-
-        res = await parseResponse(response);
-        if (res && res.success) {
-          console.debug("Delete POST succeeded with action:", action);
-          break;
-        }
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error("JSON Parse Error:", parseError);
+        throw new Error(`Invalid response format: ${responseText}`);
       }
 
-      if (!res || !res.success) {
-        for (const action of actions) {
-          const url = `${CONFIG.APPS_SCRIPT_URL}?action=${encodeURIComponent(action)}&sheet=${encodeURIComponent(CONFIG.SHEET_NAME)}&rowIndex=${encodeURIComponent(account._rowIndex)}&taskId=${encodeURIComponent(account._taskId || account["col1"] || "")}&t=${Date.now()}`;
-          const getResp = await fetch(url);
-          res = await parseResponse(getResp);
-          if (res && res.success) {
-            console.debug("Delete GET succeeded with action:", action);
-            break;
-          }
-        }
+      if (result.success) {
+        // Remove from UI locally (both pending and history)
+        setAccountData((prev) => prev.filter((item) => item._id !== account._id));
+        setHistoryData((prev) => prev.filter((item) => item._id !== account._id));
+        setSuccessMessage("Task deleted successfully (soft delete).");
+      } else {
+        throw new Error(result.error || "Failed to delete task");
       }
-
-      if (!res || !res.success) {
-        const errMsg =
-          (res && (res.error || res.message || res.text)) ||
-          "Server failed to delete row";
-        throw new Error(errMsg);
-      }
-
-      setAccountData((prev) => prev.filter((item) => item._id !== account._id));
-      setSuccessMessage("Row deleted successfully.");
     } catch (err) {
       console.error("Delete failed:", err);
       alert("Delete failed: " + (err.message || "Server error"));
@@ -1460,8 +1448,8 @@ function AccountDataPage() {
                 onClick={handleSubmit}
                 disabled={!isSubmitEnabled || isSubmitting}
                 className={`rounded-md py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200 w-full sm:w-auto ${isSubmitEnabled && !isSubmitting
-                    ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 cursor-pointer"
-                    : "bg-gray-400 cursor-not-allowed opacity-50"
+                  ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 cursor-pointer"
+                  : "bg-gray-400 cursor-not-allowed opacity-50"
                   }`}
               >
                 {isSubmitting
@@ -1926,16 +1914,16 @@ function AccountDataPage() {
                                   <div className="flex flex-col items-center">
                                     <div
                                       className={`h-4 w-4 rounded border-gray-300 ${history["col15"].toString().trim() ===
-                                          "Done"
-                                          ? "text-green-600 bg-green-100"
-                                          : "text-red-600 bg-red-100"
+                                        "Done"
+                                        ? "text-green-600 bg-green-100"
+                                        : "text-red-600 bg-red-100"
                                         }`}
                                     >
                                       <span
                                         className={`text-xs ${history["col15"].toString().trim() ===
-                                            "Done"
-                                            ? "text-green-600"
-                                            : "text-red-600"
+                                          "Done"
+                                          ? "text-green-600"
+                                          : "text-red-600"
                                           }`}
                                       >
                                         {history["col15"].toString().trim() ===
@@ -1946,9 +1934,9 @@ function AccountDataPage() {
                                     </div>
                                     <span
                                       className={`text-xs mt-1 text-center break-words ${history["col15"].toString().trim() ===
-                                          "Done"
-                                          ? "text-green-600"
-                                          : "text-red-600"
+                                        "Done"
+                                        ? "text-green-600"
+                                        : "text-red-600"
                                         }`}
                                     >
                                       {history["col15"].toString().trim()}
@@ -2097,10 +2085,10 @@ function AccountDataPage() {
                             <td className="px-3 py-4 bg-blue-50 min-w-[80px]">
                               <span
                                 className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full break-words ${history["col12"] === "Yes"
-                                    ? "bg-green-100 text-green-800"
-                                    : history["col12"] === "No"
-                                      ? "bg-red-100 text-red-800"
-                                      : "bg-gray-100 text-gray-800"
+                                  ? "bg-green-100 text-green-800"
+                                  : history["col12"] === "No"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-gray-100 text-gray-800"
                                   }`}
                               >
                                 {history["col12"] || "—"}
@@ -2478,11 +2466,11 @@ function AccountDataPage() {
                                   <label
                                     htmlFor={`upload-${account._id}`}
                                     className={`flex items-center justify-start px-2 py-1 rounded text-xs font-medium transition-colors ${isSelected
-                                        ? account["col9"]?.toUpperCase() ===
-                                          "YES"
-                                          ? "text-red-600 hover:text-red-800 hover:bg-red-50 cursor-pointer"
-                                          : "text-purple-600 hover:text-purple-800 hover:bg-purple-50 cursor-pointer"
-                                        : "text-gray-400 cursor-not-allowed"
+                                      ? account["col9"]?.toUpperCase() ===
+                                        "YES"
+                                        ? "text-red-600 hover:text-red-800 hover:bg-red-50 cursor-pointer"
+                                        : "text-purple-600 hover:text-purple-800 hover:bg-purple-50 cursor-pointer"
+                                      : "text-gray-400 cursor-not-allowed"
                                       }`}
                                   >
                                     <Upload className="h-4 w-4 mr-1 flex-shrink-0" />
@@ -2799,11 +2787,11 @@ function AccountDataPage() {
                                   {/* ✅ FILE UPLOAD BUTTON */}
                                   <label
                                     className={`flex items-center justify-center px-4 py-3 rounded-lg border-2 text-sm font-semibold transition-all ${isSelected
-                                        ? account["col9"]?.toUpperCase() ===
-                                          "YES"
-                                          ? "bg-red-50 border-red-300 text-red-700 hover:bg-red-100 hover:shadow-md active:scale-95 cursor-pointer"
-                                          : "bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100 hover:shadow-md active:scale-95 cursor-pointer"
-                                        : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
+                                      ? account["col9"]?.toUpperCase() ===
+                                        "YES"
+                                        ? "bg-red-50 border-red-300 text-red-700 hover:bg-red-100 hover:shadow-md active:scale-95 cursor-pointer"
+                                        : "bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100 hover:shadow-md active:scale-95 cursor-pointer"
+                                      : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed"
                                       } ${!isSelected ? "pointer-events-none" : ""}`}
                                   >
                                     <Upload className="h-5 w-5 mr-2" />
