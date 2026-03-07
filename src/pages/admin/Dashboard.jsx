@@ -96,10 +96,11 @@ export default function AdminDashboard() {
       filteredTasks = [...allTasks];
     } else if (type === 'completed') {
       if (dashboardType === 'delegation') {
-        // For delegation: show tasks completed exactly once
+        // For delegation: show tasks completed exactly once and are currently completed
         filteredTasks = allTasks.filter(task => {
           const completionCount = departmentData.taskCompletionFrequencyMap.get(task.id) || 0;
-          return completionCount === 1;
+          const effectiveCount = Math.max(1, completionCount);
+          return task.status === 'completed' && effectiveCount === 1;
         });
       } else {
         // For checklist: show all completed tasks
@@ -109,10 +110,11 @@ export default function AdminDashboard() {
       }
     } else if (type === 'pending') {
       if (dashboardType === 'delegation') {
-        // For delegation: show tasks completed exactly twice
+        // For delegation: show tasks completed exactly twice and are currently completed
         filteredTasks = allTasks.filter(task => {
           const completionCount = departmentData.taskCompletionFrequencyMap.get(task.id) || 0;
-          return completionCount === 2;
+          const effectiveCount = Math.max(1, completionCount);
+          return task.status === 'completed' && effectiveCount === 2;
         });
       } else {
         // For checklist: show pending tasks
@@ -122,10 +124,11 @@ export default function AdminDashboard() {
       }
     } else if (type === 'overdue') {
       if (dashboardType === 'delegation') {
-        // For delegation: show tasks completed 3 or more times
+        // For delegation: show tasks completed 3 or more times and are currently completed
         filteredTasks = allTasks.filter(task => {
           const completionCount = departmentData.taskCompletionFrequencyMap.get(task.id) || 0;
-          return completionCount >= 3;
+          const effectiveCount = Math.max(1, completionCount);
+          return task.status === 'completed' && effectiveCount >= 3;
         });
       } else {
         // For checklist: show overdue tasks
@@ -558,20 +561,16 @@ export default function AdminDashboard() {
 
               console.log("Task completion frequency map built:", taskCompletionFrequencyMap.size, "unique tasks");
 
-              // Calculate completion frequency counts directly from the map
-              // This ensures we count all tasks in DELEGATION DONE regardless of DELEGATION sheet status
-              taskCompletionFrequencyMap.forEach((count, taskId) => {
-                if (count === 1) {
-                  completedRatingOne++;
-                } else if (count === 2) {
-                  completedRatingTwo++;
-                } else if (count >= 3) {
-                  completedRatingThreePlus++;
-                }
-                console.log(`Task ${taskId} completed ${count} time(s)`);
-              });
-
-              console.log(`Completion counts - Once: ${completedRatingOne}, Twice: ${completedRatingTwo}, 3+: ${completedRatingThreePlus}`);
+              // Commenting out the global loop calculation to calculate it from processed tasks instead
+              // taskCompletionFrequencyMap.forEach((count, taskId) => {
+              //   if (count === 1) {
+              //     completedRatingOne++;
+              //   } else if (count === 2) {
+              //     completedRatingTwo++;
+              //   } else if (count >= 3) {
+              //     completedRatingThreePlus++;
+              //   }
+              // });
             }
           }
         } catch (delegationDoneErr) {
@@ -819,6 +818,28 @@ export default function AdminDashboard() {
       }).filter(task => task !== null);
 
       console.log("Processed rows (combined):", processedRows.length);
+
+      // Re-calculate completion counts directly from processed rows
+      // This ensures we only count tasks assigned to the current user (if not admin)
+      // and only count tasks that are actually completed (Actual is not null)
+      if (dashboardType === "delegation") {
+        completedRatingOne = 0;
+        completedRatingTwo = 0;
+        completedRatingThreePlus = 0;
+
+        processedRows.forEach(task => {
+          if (task.status === 'completed') {
+            const count = taskCompletionFrequencyMap.get(task.id) || 0;
+            // Map 0 to 1 for completed tasks with no DELEGATION DONE records (fallback)
+            const effectiveCount = Math.max(1, count);
+            if (effectiveCount === 1) completedRatingOne++;
+            else if (effectiveCount === 2) completedRatingTwo++;
+            else if (effectiveCount >= 3) completedRatingThreePlus++;
+          }
+        });
+
+        console.log(`User-specific Completion counts - Once: ${completedRatingOne}, Twice: ${completedRatingTwo}, 3+: ${completedRatingThreePlus}`);
+      }
 
       // Calculate completion rate
       const completionRate = totalTasks > 0 ? ((completedTasks / totalTasks) * 100).toFixed(1) : 0;
