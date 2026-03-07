@@ -124,7 +124,9 @@ const getNextOccurrences = (
     // }
 
     if (nextDate > today && nextDate <= lastWorkingDate) {
-      occurrences.push(nextDate);
+      if (nextDate.getDay() !== 0) {
+        occurrences.push(nextDate);
+      }
     }
     return occurrences;
   }
@@ -152,9 +154,9 @@ const getNextOccurrences = (
     iterationCount++;
   }
 
-  // Filter to only include dates that are in working dates
+  // Filter to only include dates that are in working dates, excluding Sundays
   return occurrences.filter((date) =>
-    workingDates.some((workingDate) => isSameDay(workingDate, date))
+    date.getDay() !== 0 && workingDates.some((workingDate) => isSameDay(workingDate, date))
   );
 };
 
@@ -310,7 +312,10 @@ const CalendarUI = ({ userRole, userName, displayName }) => {
       );
 
       for (const occurrenceDate of occurrences) {
-        const dateStr = occurrenceDate.toISOString().slice(0, 10);
+        const yyyy = occurrenceDate.getFullYear();
+        const mm = String(occurrenceDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(occurrenceDate.getDate()).padStart(2, '0');
+        const dateStr = `${yyyy}-${mm}-${dd}`;
 
         if (!map[dateStr]) {
           map[dateStr] = {
